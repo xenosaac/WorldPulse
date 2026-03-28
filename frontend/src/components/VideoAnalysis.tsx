@@ -26,7 +26,7 @@ export default function VideoAnalysis({ events, onEventDetected, onAnalysisCompl
       result.events.forEach((evt) => onEventDetected(evt));
       setExtracted(result.events.length);
       onAnalysisComplete?.();
-    } catch (err) {
+    } catch {
       toast('Video analysis failed. Using fallback data.', 'error');
     } finally {
       setLoading(false);

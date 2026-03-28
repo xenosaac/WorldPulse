@@ -1,4 +1,4 @@
-import type { Event, SupplyChain, ScenarioResult, RiskBrief, APIError } from './types';
+import type { Event, SupplyChain, ScenarioResult, RiskBrief } from './types';
 
 export async function getEvents(): Promise<Event[]> {
   const res = await fetch('/api/events');

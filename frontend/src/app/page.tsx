@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Globe from '@/components/Globe';
 import VideoAnalysis from '@/components/VideoAnalysis';
 import SupplyChain from '@/components/SupplyChain';
@@ -13,15 +13,46 @@ import EventTimeline from '@/components/EventTimeline';
 import { ToastProvider } from '@/components/Toast';
 import { useEvents } from '@/hooks/useEvents';
 import { useGeminiLive } from '@/hooks/useGeminiLive';
-import { useVideoSync } from '@/hooks/useVideoSync';
 import type { Event, SupplyChain as SupplyChainType, ScenarioResult } from '@/lib/types';
 
+const RISK_LEVELS = new Set(['normal', 'elevated', 'high', 'critical']);
+const RISK_ALIASES: Record<string, string> = {
+  low: 'normal',
+  medium: 'elevated',
+  moderate: 'elevated',
+  severe: 'high',
+};
+
+function getRiskLevel(value: unknown): string | null {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (RISK_LEVELS.has(normalized)) return normalized;
+    if (normalized in RISK_ALIASES) return RISK_ALIASES[normalized];
+
+    const numeric = Number(normalized);
+    if (!Number.isNaN(numeric)) {
+      return getRiskLevel(numeric);
+    }
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    if (value >= 80) return 'critical';
+    if (value >= 60) return 'high';
+    if (value >= 30) return 'elevated';
+    return 'normal';
+  }
+
+  return null;
+}
+
 export default function Home() {
-  const { events, loading, addEvent, refresh } = useEvents();
+  const { events, addEvent, refresh } = useEvents();
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [chain, setChain] = useState<SupplyChainType | null>(null);
   const [scenarioResult, setScenarioResult] = useState<ScenarioResult | null>(null);
   const [briefComplete, setBriefComplete] = useState(false);
+  const processedToolCallsRef = useRef(0);
 
   const handleChainLoaded = (newChain: SupplyChainType) => {
     setChain(newChain);
@@ -31,28 +62,76 @@ export default function Home() {
 
   const handleScenarioResult = (result: ScenarioResult) => {
     setScenarioResult(result);
-    // Update node risk levels from scenario impact chain
-    if (chain && Array.isArray(result.impact_chain)) {
-      const updatedNodes = chain.nodes.map((node) => {
-        const impact = (result.impact_chain as any[]).find(
+    setChain((currentChain) => {
+      if (!currentChain || !Array.isArray(result.impact_chain)) return currentChain;
+
+      let changed = false;
+      const impacts = result.impact_chain as Record<string, unknown>[];
+      const updatedNodes = currentChain.nodes.map((node) => {
+        const impact = impacts.find(
           (item) => item.node_name === node.name || item.node === node.name
         );
-        if (impact) {
-          const severity = (impact.impact_severity || '').toLowerCase();
-          const riskMap: Record<string, string> = { critical: 'critical', high: 'high', elevated: 'elevated' };
-          return { ...node, risk_level: riskMap[severity] || 'normal' };
-        }
-        return node;
+        const riskLevel = impact
+          ? getRiskLevel(impact.risk_level) ?? getRiskLevel(impact.impact_severity)
+          : null;
+        if (!riskLevel || riskLevel === node.risk_level) return node;
+        changed = true;
+        return { ...node, risk_level: riskLevel };
       });
-      setChain({ ...chain, nodes: updatedNodes });
-    }
+
+      return changed ? { ...currentChain, nodes: updatedNodes } : currentChain;
+    });
   };
 
-  const [muted, setMuted] = useState(false);
+  const [muted] = useState(false);
+  const {
+    status: geminiStatus,
+    connect,
+    disconnect,
+    startScenario,
+    startRecording,
+    stopRecording,
+    isConnected,
+    isRecording,
+    transcript,
+    toolCalls,
+  } = useGeminiLive();
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const { visibleEvents, isPlaying } = useVideoSync(events, videoRef);
-  const { status: geminiStatus, connect, disconnect, startScenario, isConnected } = useGeminiLive();
+  useEffect(() => {
+    if (toolCalls.length < processedToolCallsRef.current) {
+      processedToolCallsRef.current = 0;
+    }
+    if (toolCalls.length === processedToolCallsRef.current) return;
+
+    const newToolCalls = toolCalls.slice(processedToolCallsRef.current);
+    processedToolCallsRef.current = toolCalls.length;
+
+    const riskUpdates = new Map<string, string>();
+    for (const toolCall of newToolCalls) {
+      if (toolCall.name !== 'update_supply_chain_risk') continue;
+      const nodeName = typeof toolCall.args.node_name === 'string' ? toolCall.args.node_name.trim().toLowerCase() : '';
+      const riskLevel = getRiskLevel(toolCall.args.risk_level);
+      if (nodeName && riskLevel) {
+        riskUpdates.set(nodeName, riskLevel);
+      }
+    }
+
+    if (riskUpdates.size === 0) return;
+
+    setChain((currentChain) => {
+      if (!currentChain) return currentChain;
+
+      let changed = false;
+      const updatedNodes = currentChain.nodes.map((node) => {
+        const nextRiskLevel = riskUpdates.get(node.name.trim().toLowerCase());
+        if (!nextRiskLevel || nextRiskLevel === node.risk_level) return node;
+        changed = true;
+        return { ...node, risk_level: nextRiskLevel };
+      });
+
+      return changed ? { ...currentChain, nodes: updatedNodes } : currentChain;
+    });
+  }, [toolCalls]);
 
   return (
     <ToastProvider>
@@ -118,14 +197,37 @@ export default function Home() {
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary teal-pulse" />
-                        <span className="text-[10px] text-primary">Connected</span>
+                        <span className="text-[10px] text-primary capitalize">{geminiStatus}</span>
                       </div>
                       <button
                         onClick={() => startScenario(chain.id)}
-                        className="w-full py-2 bg-primary/10 text-primary text-[10px] font-label rounded hover:bg-primary/20 transition-colors"
+                        disabled={geminiStatus === 'connecting'}
+                        className="w-full py-2 bg-primary/10 text-primary text-[10px] font-label rounded hover:bg-primary/20 transition-colors disabled:opacity-50"
                       >
-                        Voice scenario
+                        {geminiStatus === 'connecting' ? 'Starting session...' : 'Start voice scenario'}
                       </button>
+                      <div className="grid grid-cols-1 gap-2">
+                        <button
+                          onClick={isRecording ? stopRecording : startRecording}
+                          disabled={geminiStatus !== 'active'}
+                          className="w-full py-2 border border-primary/30 text-primary text-[10px] font-label rounded hover:bg-primary/5 transition-colors disabled:opacity-40"
+                        >
+                          {isRecording ? 'Stop mic' : 'Start mic'}
+                        </button>
+                      </div>
+                      {(isRecording || transcript || toolCalls.length > 0) && (
+                        <div className="rounded border border-white/5 bg-slate-800/30 px-3 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] font-label uppercase text-slate-500">Live trace</span>
+                            <span className="text-[9px] data-mono text-slate-500">
+                              {toolCalls.length} updates
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400 leading-relaxed">
+                            {transcript || (isRecording ? 'Listening for scenario input...' : 'Waiting for Gemini response...')}
+                          </p>
+                        </div>
+                      )}
                       <button
                         onClick={disconnect}
                         className="w-full py-1.5 text-slate-500 text-[10px] font-label rounded hover:text-slate-300 transition-colors"

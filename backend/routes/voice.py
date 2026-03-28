@@ -22,6 +22,7 @@ import traceback
 from contextlib import closing
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from google.genai import types
 
 import db
 from services.gemini_live import live_manager
@@ -68,8 +69,9 @@ async def voice_ws(websocket: WebSocket):
             if msg_type == "start_scenario":
                 await _cleanup_session()
                 await _send(websocket, {"type": "session", "status": "connecting"})
+                context = _build_live_context(msg.get("chain_id"), None)
                 try:
-                    session = await live_manager.create_scenario_session()
+                    session = await live_manager.create_scenario_session(context)
                     await _send(websocket, {"type": "session", "status": "active"})
                     receive_task = asyncio.create_task(_receive_loop(websocket, session))
                 except Exception as e:
@@ -81,13 +83,18 @@ async def voice_ws(websocket: WebSocket):
             elif msg_type == "start_briefing":
                 await _cleanup_session()
                 await _send(websocket, {"type": "session", "status": "connecting"})
-                context = _build_briefing_context(
+                context = _build_live_context(
                     msg.get("chain_id"), msg.get("scenario_id")
                 )
                 try:
                     session = await live_manager.create_briefing_session(context)
                     await _send(websocket, {"type": "session", "status": "active"})
-                    await session.send(input="Please deliver the risk briefing now.", end_of_turn=True)
+                    await session.send_client_content(
+                        turns=types.Content(
+                            role="user",
+                            parts=[types.Part(text="Please deliver the risk briefing now.")],
+                        )
+                    )
                     receive_task = asyncio.create_task(_receive_loop(websocket, session))
                 except Exception as e:
                     await _send(websocket, {
@@ -101,7 +108,9 @@ async def voice_ws(websocket: WebSocket):
                     continue
                 try:
                     audio_bytes = base64.b64decode(data)
-                    await session.send(input=audio_bytes)
+                    await session.send_realtime_input(
+                        audio=types.Blob(data=audio_bytes, mime_type="audio/webm"),
+                    )
                 except Exception:
                     pass
 
@@ -125,24 +134,54 @@ async def _receive_loop(websocket: WebSocket, session):
     """Background task: receive from Gemini Live API, forward to browser."""
     try:
         async for response in session.receive():
-            if hasattr(response, "data") and response.data:
-                audio_b64 = base64.b64encode(response.data).decode()
-                await _send(websocket, {"type": "audio", "data": audio_b64})
+            server_content = getattr(response, "server_content", None)
+            if server_content:
+                model_turn = getattr(server_content, "model_turn", None)
+                if model_turn and getattr(model_turn, "parts", None):
+                    for part in model_turn.parts:
+                        inline_data = getattr(part, "inline_data", None)
+                        if inline_data and getattr(inline_data, "data", None):
+                            audio_b64 = base64.b64encode(inline_data.data).decode()
+                            await _send(websocket, {"type": "audio", "data": audio_b64})
 
-            if hasattr(response, "text") and response.text:
-                await _send(websocket, {"type": "transcript", "text": response.text})
+                        text = getattr(part, "text", None)
+                        if text:
+                            await _send(websocket, {"type": "transcript", "text": text})
 
-            if hasattr(response, "tool_call") and response.tool_call:
-                tc = response.tool_call
-                try:
-                    args = json.loads(tc.args) if isinstance(tc.args, str) else tc.args
-                except (json.JSONDecodeError, TypeError):
-                    args = {"raw": str(tc.args)}
-                await _send(websocket, {
-                    "type": "tool_call",
-                    "name": tc.name,
-                    "args": args,
-                })
+                for transcript_attr in ("input_transcription", "output_transcription"):
+                    transcript = getattr(server_content, transcript_attr, None)
+                    text = getattr(transcript, "text", None)
+                    if text:
+                        await _send(websocket, {"type": "transcript", "text": text})
+
+            tool_call = getattr(response, "tool_call", None)
+            function_calls = getattr(tool_call, "function_calls", None) if tool_call else None
+            if function_calls:
+                function_responses = []
+                for call in function_calls:
+                    call_name = getattr(call, "name", None)
+                    call_id = getattr(call, "id", None) or call_name
+                    raw_args = getattr(call, "args", None)
+                    if not call_name:
+                        continue
+                    try:
+                        args = json.loads(raw_args) if isinstance(raw_args, str) else (raw_args if isinstance(raw_args, dict) else {})
+                    except (json.JSONDecodeError, TypeError):
+                        args = {"raw": str(raw_args)}
+                    await _send(websocket, {
+                        "type": "tool_call",
+                        "name": call_name,
+                        "args": args,
+                    })
+                    function_responses.append(
+                        types.FunctionResponse(
+                            id=call_id,
+                            name=call_name,
+                            response={"status": "ok"},
+                        )
+                    )
+
+                await session.send_tool_response(function_responses=function_responses)
 
     except asyncio.CancelledError:
         return
@@ -161,8 +200,8 @@ async def _send(ws: WebSocket, data: dict):
     await ws.send_text(json.dumps(data))
 
 
-def _build_briefing_context(chain_id: str | None, scenario_id: str | None) -> str:
-    """Build context string from DB for the briefing session."""
+def _build_live_context(chain_id: str | None, scenario_id: str | None) -> str:
+    """Build a context string from DB for live voice sessions."""
     with closing(db.get_db()) as conn:
         parts = []
 

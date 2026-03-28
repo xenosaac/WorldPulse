@@ -7,17 +7,73 @@ On parse failure, GeminiParseError is raised so route handlers trigger fallback.
 import asyncio
 import json
 import logging
-import os
-from google import genai
 from google.genai import types
+from pydantic import BaseModel, Field
+from typing import Literal
 from services import get_gemini_client
 
 logger = logging.getLogger(__name__)
+
+VIDEO_MODEL = "gemini-2.5-flash"
+SCENARIO_MODEL = "gemini-3-flash-preview"
+BRIEF_MODEL = "gemini-3-flash-preview"
+
+# SDK-level timeout so the actual HTTP request is cancelled (not just the
+# coroutine wrapper, which is what asyncio.wait_for does with to_thread).
+_TIMEOUT = types.HttpOptions(timeout=30)
 
 
 class GeminiParseError(Exception):
     """Raised when Gemini returns unparseable or empty results."""
     pass
+
+
+class VideoEventSchema(BaseModel):
+    title: str
+    description: str
+    lat: float
+    lng: float
+    severity: Literal["low", "medium", "high", "critical"] = "medium"
+    confidence: float | None = None
+    evidence: str | None = None
+    affected_sectors: list[str] = Field(default_factory=list)
+    video_timestamp: float | None = None
+
+
+class VideoAnalysisSchema(BaseModel):
+    events: list[VideoEventSchema]
+
+
+class ScenarioImpactSchema(BaseModel):
+    node_name: str
+    risk_level: Literal["normal", "elevated", "high", "critical"]
+    impact_severity: float | None = None
+    impact_description: str
+    timeline: str
+    alternative_options: str
+    cost_change_percent: float | None = None
+
+
+class ScenarioResultSchema(BaseModel):
+    impact_chain: list[ScenarioImpactSchema]
+    overall_risk: Literal["low", "medium", "high", "critical"]
+    executive_summary: str
+
+
+class RiskMatrixRowSchema(BaseModel):
+    node_name: str
+    risk_level: Literal["normal", "elevated", "high", "critical"]
+    primary_threat: str
+    mitigation: str
+
+
+class BriefSchema(BaseModel):
+    executive_summary: str
+    risk_matrix: list[RiskMatrixRowSchema]
+    scenario_analysis: str
+    recommendations: list[str]
+    key_indicators: list[str]
+    full_report: str
 
 
 def _validate_event(evt: dict) -> dict:
@@ -81,11 +137,13 @@ async def analyze_video(file_uri: str) -> list[dict]:
                 VIDEO_ANALYSIS_PROMPT,
             ]
         return client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=VIDEO_MODEL,
             contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
+                response_schema=VideoAnalysisSchema,
                 temperature=0.3,
+                http_options=_TIMEOUT,
             ),
         )
 
@@ -99,7 +157,13 @@ async def analyze_video(file_uri: str) -> list[dict]:
     except json.JSONDecodeError as e:
         raise GeminiParseError(f"Gemini returned invalid JSON: {e}")
 
-    events = result.get("events", [])
+    if isinstance(result, list):
+        events = result
+    elif isinstance(result, dict):
+        events = result.get("events", [])
+    else:
+        raise GeminiParseError(f"Gemini returned unexpected type: {type(result)}")
+
     if not events:
         raise GeminiParseError("Gemini returned zero events from video")
 
@@ -118,7 +182,8 @@ SUPPLY CHAIN:
 SCENARIO: {scenario_input}
 
 For each supply chain node, analyze:
-- impact_severity: 0-100 (how badly this node is affected)
+- risk_level: one of "normal", "elevated", "high", "critical"
+- impact_severity: 0-100 (numeric severity score)
 - impact_description: what happens to this node
 - timeline: when the impact hits (e.g. "immediate", "1-2 weeks", "1-3 months")
 - alternative_options: what alternatives exist
@@ -132,7 +197,7 @@ Return as JSON with keys: "impact_chain" (array of node impacts), "overall_risk"
 
 
 async def simulate_scenario(scenario_input: str, supply_chain: dict) -> dict:
-    """Run a scenario simulation using Gemini 2.0 Flash with Google Search grounding."""
+    """Run a scenario simulation using Gemini 3 Flash with Google Search grounding."""
     client = get_gemini_client()
 
     prompt = SCENARIO_PROMPT_TEMPLATE.format(
@@ -142,12 +207,14 @@ async def simulate_scenario(scenario_input: str, supply_chain: dict) -> dict:
 
     def _call():
         return client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=SCENARIO_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
+                response_schema=ScenarioResultSchema,
                 temperature=0.4,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
+                http_options=_TIMEOUT,
             ),
         )
 
@@ -160,6 +227,9 @@ async def simulate_scenario(scenario_input: str, supply_chain: dict) -> dict:
         result = json.loads(response.text)
     except json.JSONDecodeError as e:
         raise GeminiParseError(f"Gemini returned invalid JSON: {e}")
+
+    if not isinstance(result, dict):
+        raise GeminiParseError(f"Gemini returned non-object for scenario: {type(result)}")
 
     overall_risk = str(result.get("overall_risk", "unknown")).lower()
     if overall_risk not in ("low", "medium", "high", "critical"):
@@ -201,7 +271,7 @@ Write in professional analyst tone. Return as JSON with keys:
 async def generate_brief(
     events: list, supply_chain: dict, scenario: dict | None = None
 ) -> dict:
-    """Generate a comprehensive risk brief using Gemini 2.0 Flash."""
+    """Generate a comprehensive risk brief using Gemini 2.5 Flash."""
     client = get_gemini_client()
 
     scenario_section = ""
@@ -216,11 +286,13 @@ async def generate_brief(
 
     def _call():
         return client.models.generate_content(
-            model="gemini-2.0-flash",
+            model=BRIEF_MODEL,
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
+                response_schema=BriefSchema,
                 temperature=0.5,
+                http_options=_TIMEOUT,
             ),
         )
 
@@ -233,6 +305,9 @@ async def generate_brief(
         result = json.loads(response.text)
     except json.JSONDecodeError as e:
         raise GeminiParseError(f"Gemini returned invalid JSON: {e}")
+
+    if not isinstance(result, dict):
+        raise GeminiParseError(f"Gemini returned non-object for brief: {type(result)}")
 
     return {
         "executive_summary": result.get("executive_summary", ""),

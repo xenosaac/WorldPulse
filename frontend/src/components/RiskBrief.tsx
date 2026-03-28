@@ -29,7 +29,7 @@ export default function RiskBrief({ chainId, scenarioId, onBriefComplete }: Risk
       const res = await generateBrief(chainId, scenarioId || undefined);
       setBrief(res);
       onBriefComplete?.();
-    } catch (err) {
+    } catch {
       toast('Brief generation failed. Check your connection.', 'error');
     } finally {
       setLoading(false);

@@ -17,6 +17,71 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
+RISK_LEVELS = ("normal", "elevated", "high", "critical")
+
+
+def _coerce_risk_level(value) -> str | None:
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        aliases = {
+            "low": "normal",
+            "medium": "elevated",
+            "moderate": "elevated",
+            "severe": "high",
+        }
+        if normalized in RISK_LEVELS:
+            return normalized
+        if normalized in aliases:
+            return aliases[normalized]
+        try:
+            value = float(normalized)
+        except ValueError:
+            return None
+
+    if isinstance(value, (int, float)):
+        if value >= 80:
+            return "critical"
+        if value >= 60:
+            return "high"
+        if value >= 30:
+            return "elevated"
+        return "normal"
+
+    return None
+
+
+def _normalize_impact_chain(raw_impact_chain) -> list[dict]:
+    if not isinstance(raw_impact_chain, list):
+        return []
+
+    normalized_chain = []
+    for item in raw_impact_chain:
+        if not isinstance(item, dict):
+            continue
+
+        normalized_item = dict(item)
+        if "node_name" not in normalized_item:
+            normalized_item["node_name"] = (
+                normalized_item.get("node")
+                or normalized_item.get("name")
+                or "Unknown"
+            )
+
+        if "cost_change_percent" not in normalized_item and "cost_change" in normalized_item:
+            normalized_item["cost_change_percent"] = normalized_item.pop("cost_change")
+
+        risk_level = _coerce_risk_level(normalized_item.get("risk_level"))
+        if risk_level is None:
+            risk_level = _coerce_risk_level(normalized_item.get("impact_severity"))
+        normalized_item["risk_level"] = risk_level or "normal"
+
+        normalized_chain.append(normalized_item)
+
+    return normalized_chain
+
 
 class ScenarioRequest(BaseModel):
     scenario_input: str = Field(..., max_length=2000)
@@ -43,9 +108,7 @@ async def simulate_scenario(req: ScenarioRequest):
 
     # Call Gemini, fall back to cached response on failure
     try:
-        result = await gemini_batch.simulate_scenario(
-            req.scenario_input, supply_chain
-        )
+        result = await gemini_batch.simulate_scenario(req.scenario_input, supply_chain)
     except Exception as e:
         logger.warning("Gemini scenario failed, using fallback: %s", e)
         fallback = get_fallback("simulate-scenario", input_hash=req.chain_id)
@@ -53,6 +116,8 @@ async def simulate_scenario(req: ScenarioRequest):
             result = fallback
         else:
             raise HTTPException(status_code=502, detail=f"Scenario simulation failed: {e}")
+
+    impact_chain = _normalize_impact_chain(result.get("impact_chain", []))
 
     # Save to DB
     scenario_id = f"scn-{uuid.uuid4().hex[:12]}"
@@ -66,7 +131,7 @@ async def simulate_scenario(req: ScenarioRequest):
                 scenario_id,
                 req.scenario_input,
                 req.chain_id,
-                json.dumps(result.get("impact_chain", [])),
+                json.dumps(impact_chain),
                 result.get("overall_risk", "unknown"),
                 result.get("gemini_response"),
                 "text",
@@ -74,15 +139,6 @@ async def simulate_scenario(req: ScenarioRequest):
             ),
         )
         conn.commit()
-
-    # Normalize impact_chain keys for frontend consistency
-    impact_chain = result.get("impact_chain", [])
-    for item in impact_chain:
-        if isinstance(item, dict):
-            if "node_name" not in item:
-                item["node_name"] = item.pop("node", item.pop("name", "Unknown"))
-            if "cost_change_percent" not in item and "cost_change" in item:
-                item["cost_change_percent"] = item.pop("cost_change")
 
     return {
         "id": scenario_id,
@@ -110,4 +166,5 @@ async def get_scenario(scenario_id: str):
                 d["impact_chain"] = json.loads(d["impact_chain"])
             except (json.JSONDecodeError, ValueError):
                 d["impact_chain"] = []
+        d["impact_chain"] = _normalize_impact_chain(d.get("impact_chain", []))
         return d

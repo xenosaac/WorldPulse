@@ -6,6 +6,15 @@ import sys
 
 import db
 
+RESET_TABLES = (
+    "risk_briefs",
+    "scenario_results",
+    "supply_chain_nodes",
+    "supply_chains",
+    "events",
+    "fallbacks",
+)
+
 
 def seed():
     seed_path = os.path.join(os.path.dirname(__file__), "..", "data", "seed.json")
@@ -20,6 +29,10 @@ def seed():
 
     db.init_db()
     conn = db.get_db()
+
+    # Reset demo-managed tables so every seed produces the same baseline state.
+    for table in RESET_TABLES:
+        conn.execute(f"DELETE FROM {table}")
 
     # Insert events
     events = data.get("events", [])

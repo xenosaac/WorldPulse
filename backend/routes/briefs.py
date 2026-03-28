@@ -54,7 +54,10 @@ async def generate_brief(req: BriefRequest):
             if scn_row:
                 scenario = dict(scn_row)
                 if scenario.get("impact_chain") and isinstance(scenario["impact_chain"], str):
-                    scenario["impact_chain"] = json.loads(scenario["impact_chain"])
+                    try:
+                        scenario["impact_chain"] = json.loads(scenario["impact_chain"])
+                    except (json.JSONDecodeError, ValueError):
+                        scenario["impact_chain"] = []
 
     # Call Gemini, fall back to cached response on failure
     try:

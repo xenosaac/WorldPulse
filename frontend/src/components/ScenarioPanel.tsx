@@ -36,7 +36,7 @@ export default function ScenarioPanel({ chainId, onResult }: ScenarioPanelProps)
       const res = await simulateScenario(text, chainId);
       setResult(res);
       onResult(res);
-    } catch (err) {
+    } catch {
       toast('Scenario simulation failed. Check your connection.', 'error');
     } finally {
       setLoading(false);
@@ -108,7 +108,7 @@ export default function ScenarioPanel({ chainId, onResult }: ScenarioPanelProps)
                     {impact.node_name || impact.node || `Node ${i + 1}`}
                   </span>
                   <span className="text-[11px] data-mono text-primary">
-                    {impact.cost_change_percent != null ? `+${impact.cost_change_percent}%` : impact.impact_severity || ''}
+                    {impact.cost_change_percent != null ? `${impact.cost_change_percent > 0 ? '+' : ''}${impact.cost_change_percent}%` : impact.impact_severity || ''}
                   </span>
                 </div>
               ))}

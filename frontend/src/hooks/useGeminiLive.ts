@@ -12,12 +12,84 @@ interface ToolCallEvent {
 
 export function useGeminiLive() {
   const [isConnected, setIsConnected] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [status, setStatus] = useState<GeminiLiveStatus>('idle');
   const [toolCalls, setToolCalls] = useState<ToolCallEvent[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playAudioChunk = useCallback((base64: string) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      audioContextRef.current
+        .decodeAudioData(bytes.buffer.slice(0))
+        .then((audioBuffer) => {
+          const source = audioContextRef.current!.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioContextRef.current!.destination);
+          source.start();
+        })
+        .catch(() => {
+          /* ignore decode errors for raw PCM chunks */
+        });
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const sendAudio = useCallback((audioData: string) => {
+    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({ type: 'audio', data: audioData }));
+  }, []);
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+    }
+    mediaRecorderRef.current = null;
+    setIsRecording(false);
+  }, []);
+
+  const startRecording = useCallback(async () => {
+    if (isRecording) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0) {
+          const buffer = await event.data.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          let binary = '';
+          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+          sendAudio(btoa(binary));
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+        mediaRecorderRef.current = null;
+        setIsRecording(false);
+      };
+
+      mediaRecorder.start(250); // send chunks every 250ms
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+      setStatus('error');
+      setIsRecording(false);
+    }
+  }, [isRecording, sendAudio]);
 
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
@@ -43,8 +115,11 @@ export function useGeminiLive() {
       if (msg.type === 'session') {
         const s = msg.status as GeminiLiveStatus;
         setStatus(s);
-        if (s === 'active') setIsConnected(true);
-        if (s === 'error' || s === 'complete') setIsConnected(false);
+        if (s === 'active' || s === 'connected') setIsConnected(true);
+        if (s === 'error' || s === 'complete') {
+          stopRecording();
+          setIsConnected(s !== 'error');
+        }
       } else if (msg.type === 'transcript') {
         setTranscript((prev) => prev + msg.text);
       } else if (msg.type === 'tool_call') {
@@ -55,14 +130,16 @@ export function useGeminiLive() {
     };
 
     ws.onclose = () => {
+      stopRecording();
       setIsConnected(false);
       setStatus('idle');
     };
 
     ws.onerror = () => {
+      stopRecording();
       setStatus('error');
     };
-  }, []);
+  }, [playAudioChunk, stopRecording]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -75,83 +152,25 @@ export function useGeminiLive() {
     setStatus('idle');
     setTranscript('');
     setToolCalls([]);
-  }, []);
+  }, [stopRecording]);
 
   const startScenario = useCallback((chainId: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    stopRecording();
     setTranscript('');
     setToolCalls([]);
     wsRef.current.send(JSON.stringify({ type: 'start_scenario', chain_id: chainId }));
-  }, []);
+  }, [stopRecording]);
 
   const startBriefing = useCallback((chainId: string, scenarioId?: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
+    stopRecording();
     setTranscript('');
     setToolCalls([]);
     wsRef.current.send(
       JSON.stringify({ type: 'start_briefing', chain_id: chainId, scenario_id: scenarioId })
     );
-  }, []);
-
-  const sendAudio = useCallback((audioData: string) => {
-    if (wsRef.current?.readyState !== WebSocket.OPEN) return;
-    wsRef.current.send(JSON.stringify({ type: 'audio', data: audioData }));
-  }, []);
-
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0) {
-          const buffer = await event.data.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          let binary = '';
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          sendAudio(btoa(binary));
-        }
-      };
-
-      mediaRecorder.start(250); // send chunks every 250ms
-    } catch (err) {
-      console.error('Failed to start recording:', err);
-      setStatus('error');
-    }
-  }, [sendAudio]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((t) => t.stop());
-      mediaRecorderRef.current = null;
-    }
-  }, []);
-
-  const playAudioChunk = (base64: string) => {
-    try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-      }
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      audioContextRef.current
-        .decodeAudioData(bytes.buffer.slice(0))
-        .then((audioBuffer) => {
-          const source = audioContextRef.current!.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(audioContextRef.current!.destination);
-          source.start();
-        })
-        .catch(() => {
-          /* ignore decode errors for raw PCM chunks */
-        });
-    } catch {
-      /* ignore */
-    }
-  };
+  }, [stopRecording]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -171,6 +190,7 @@ export function useGeminiLive() {
     startRecording,
     stopRecording,
     isConnected,
+    isRecording,
     transcript,
     status,
     toolCalls,

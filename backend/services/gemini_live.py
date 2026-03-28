@@ -25,6 +25,12 @@ from services import get_gemini_client
 
 logger = logging.getLogger(__name__)
 
+LIVE_MODEL = "gemini-3.1-flash-live-preview"
+
+
+def _instruction_content(text: str) -> types.Content:
+    return types.Content(parts=[types.Part(text=text)])
+
 
 # System instructions per session type
 SCENARIO_SYSTEM_INSTRUCTION = """You are a senior geopolitical risk analyst at a global intelligence firm.
@@ -69,36 +75,80 @@ SCENARIO_TOOLS = [
 ]
 
 
+class ManagedLiveSession:
+    """Wrap the SDK's async context manager as a session with explicit close()."""
+
+    def __init__(self, session_cm):
+        self._session_cm = session_cm
+        self._session = None
+
+    @classmethod
+    async def open(cls, session_cm):
+        managed = cls(session_cm)
+        managed._session = await session_cm.__aenter__()
+        return managed
+
+    async def send(self, *args, **kwargs):
+        return await self._session.send(*args, **kwargs)
+
+    async def send_client_content(self, *args, **kwargs):
+        return await self._session.send_client_content(*args, **kwargs)
+
+    async def send_realtime_input(self, *args, **kwargs):
+        return await self._session.send_realtime_input(*args, **kwargs)
+
+    async def send_tool_response(self, *args, **kwargs):
+        return await self._session.send_tool_response(*args, **kwargs)
+
+    def receive(self):
+        return self._session.receive()
+
+    async def close(self):
+        if self._session_cm is None:
+            return
+        await self._session_cm.__aexit__(None, None, None)
+        self._session_cm = None
+        self._session = None
+
+
 class LiveSessionManager:
     """Manages Gemini Live API sessions for voice relay."""
 
-    async def create_scenario_session(self):
+    async def create_scenario_session(self, context: str = ""):
         """Create a Live API session for voice scenario simulation."""
         client = get_gemini_client()
-        config = types.LiveConnectConfig(
-            system_instruction=SCENARIO_SYSTEM_INSTRUCTION,
-            tools=SCENARIO_TOOLS,
-            response_modalities=["AUDIO", "TEXT"],
-        )
-        session = await client.aio.live.connect(
-            model="gemini-2.0-flash-live-001",
+        instruction = SCENARIO_SYSTEM_INSTRUCTION
+        if context:
+            instruction = f"{instruction}\n\nWORLD PULSE CONTEXT:\n{context}"
+        config = {
+            "system_instruction": _instruction_content(instruction),
+            "tools": SCENARIO_TOOLS,
+            "response_modalities": ["AUDIO"],
+            "input_audio_transcription": {},
+            "output_audio_transcription": {},
+        }
+        session_cm = client.aio.live.connect(
+            model=LIVE_MODEL,
             config=config,
         )
-        return session
+        return await ManagedLiveSession.open(session_cm)
 
     async def create_briefing_session(self, context: str):
         """Create a Live API session for voice-narrated briefing."""
         client = get_gemini_client()
-        instruction = BRIEFING_SYSTEM_INSTRUCTION + f"\n\nCONTEXT:\n{context}"
-        config = types.LiveConnectConfig(
-            system_instruction=instruction,
-            response_modalities=["AUDIO", "TEXT"],
-        )
-        session = await client.aio.live.connect(
-            model="gemini-2.0-flash-live-001",
+        instruction = BRIEFING_SYSTEM_INSTRUCTION
+        if context:
+            instruction = f"{instruction}\n\nWORLD PULSE CONTEXT:\n{context}"
+        config = {
+            "system_instruction": _instruction_content(instruction),
+            "response_modalities": ["AUDIO"],
+            "output_audio_transcription": {},
+        }
+        session_cm = client.aio.live.connect(
+            model=LIVE_MODEL,
             config=config,
         )
-        return session
+        return await ManagedLiveSession.open(session_cm)
 
 
 # Singleton
