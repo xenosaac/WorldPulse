@@ -27,6 +27,7 @@ export function useGeminiLive() {
   const wsRef = useRef<WebSocket | null>(null);
   const captureRef = useRef<PcmCapture | null>(null);
   const playbackCtxRef = useRef<AudioContext | null>(null);
+  const nextPlayTimeRef = useRef(0);
 
   // ── Playback: raw PCM 16-bit LE mono from Gemini (24 kHz output) ──────────
   const playAudioChunk = useCallback((base64: string) => {
@@ -48,7 +49,11 @@ export function useGeminiLive() {
       const src = ctx.createBufferSource();
       src.buffer = buf;
       src.connect(ctx.destination);
-      src.start();
+      // Schedule after the previous chunk ends so they don't overlap
+      const now = ctx.currentTime;
+      const startAt = Math.max(now, nextPlayTimeRef.current);
+      src.start(startAt);
+      nextPlayTimeRef.current = startAt + buf.duration;
     } catch {
       /* ignore decode errors */
     }
@@ -99,7 +104,12 @@ export function useGeminiLive() {
       };
 
       source.connect(processor);
-      processor.connect(ctx.destination); // required for onaudioprocess to fire
+      // Route through a silent gain node — onaudioprocess still fires
+      // but mic audio doesn't play through speakers (prevents feedback)
+      const muteNode = ctx.createGain();
+      muteNode.gain.value = 0;
+      processor.connect(muteNode);
+      muteNode.connect(ctx.destination);
 
       captureRef.current = { stream, ctx, source, processor };
       setIsRecording(true);
@@ -167,6 +177,7 @@ export function useGeminiLive() {
     stopRecording();
     wsRef.current?.close();
     wsRef.current = null;
+    nextPlayTimeRef.current = 0;
     setIsConnected(false);
     setStatus('idle');
     setTranscript('');
@@ -176,6 +187,7 @@ export function useGeminiLive() {
   const startScenario = useCallback((chainId: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     stopRecording();
+    nextPlayTimeRef.current = 0;
     setTranscript('');
     setToolCalls([]);
     wsRef.current.send(JSON.stringify({ type: 'start_scenario', chain_id: chainId }));
@@ -184,6 +196,7 @@ export function useGeminiLive() {
   const startBriefing = useCallback((chainId: string, scenarioId?: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     stopRecording();
+    nextPlayTimeRef.current = 0;
     setTranscript('');
     setToolCalls([]);
     wsRef.current.send(
