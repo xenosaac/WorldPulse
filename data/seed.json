@@ -1,0 +1,163 @@
+{
+  "events": [
+    {
+      "id": "evt-001",
+      "title": "Taiwan Strait Military Exercises",
+      "description": "PLA conducts live-fire exercises near Taiwan's eastern coast, disrupting shipping lanes",
+      "lat": 24.5,
+      "lng": 121.5,
+      "severity": "critical",
+      "affected_sectors": ["semiconductors", "shipping", "electronics"],
+      "source_type": "news",
+      "source_url": null,
+      "confidence": 95,
+      "evidence": "Multiple defense ministry confirmations + satellite imagery",
+      "video_timestamp": 5.0,
+      "extracted_at": "2026-03-27T10:00:00Z"
+    },
+    {
+      "id": "evt-002",
+      "title": "Suez Canal Container Ship Grounding",
+      "description": "Large container vessel blocks southbound traffic in Suez Canal",
+      "lat": 30.5,
+      "lng": 32.3,
+      "severity": "high",
+      "affected_sectors": ["shipping", "energy", "manufacturing"],
+      "source_type": "news",
+      "source_url": null,
+      "confidence": 88,
+      "evidence": "Suez Canal Authority statement + vessel tracking data",
+      "video_timestamp": 15.0,
+      "extracted_at": "2026-03-27T10:05:00Z"
+    },
+    {
+      "id": "evt-003",
+      "title": "Red Sea Shipping Attacks Escalate",
+      "description": "Houthi forces target commercial vessels in the Bab el-Mandeb strait",
+      "lat": 13.0,
+      "lng": 43.0,
+      "severity": "high",
+      "affected_sectors": ["shipping", "energy", "insurance"],
+      "source_type": "news",
+      "source_url": null,
+      "confidence": 92,
+      "evidence": "US CENTCOM reports + Lloyd's of London maritime alerts",
+      "video_timestamp": 25.0,
+      "extracted_at": "2026-03-27T10:10:00Z"
+    },
+    {
+      "id": "evt-004",
+      "title": "Vietnam Factory Workers Strike",
+      "description": "Major electronics assembly workers strike in Ho Chi Minh City industrial zone",
+      "lat": 10.8,
+      "lng": 106.7,
+      "severity": "medium",
+      "affected_sectors": ["electronics", "manufacturing", "semiconductors"],
+      "source_type": "news",
+      "source_url": null,
+      "confidence": 78,
+      "evidence": "Local news reports + social media verification",
+      "video_timestamp": 35.0,
+      "extracted_at": "2026-03-27T10:15:00Z"
+    },
+    {
+      "id": "evt-005",
+      "title": "South China Sea Naval Standoff",
+      "description": "Philippine and Chinese coast guard vessels in extended standoff near Second Thomas Shoal",
+      "lat": 9.8,
+      "lng": 115.8,
+      "severity": "medium",
+      "affected_sectors": ["shipping", "fishing", "energy"],
+      "source_type": "news",
+      "source_url": null,
+      "confidence": 85,
+      "evidence": "Philippine coast guard live stream + Reuters reporting",
+      "video_timestamp": null,
+      "extracted_at": "2026-03-27T10:20:00Z"
+    }
+  ],
+  "supply_chains": [
+    {
+      "id": "chain-electronics",
+      "name": "Electronics Supply Chain (TSMC → US/EU)",
+      "description": "Global electronics supply chain from chip fabrication through assembly to distribution"
+    }
+  ],
+  "supply_chain_nodes": [
+    {
+      "id": "node-tsmc",
+      "chain_id": "chain-electronics",
+      "name": "TSMC Fab 18",
+      "role": "chip_manufacturing",
+      "lat": 24.8,
+      "lng": 120.9,
+      "country": "Taiwan",
+      "risk_level": "critical",
+      "sort_order": 1
+    },
+    {
+      "id": "node-vietnam",
+      "chain_id": "chain-electronics",
+      "name": "Vietnam Assembly Hub",
+      "role": "assembly",
+      "lat": 10.8,
+      "lng": 106.7,
+      "country": "Vietnam",
+      "risk_level": "elevated",
+      "sort_order": 2
+    },
+    {
+      "id": "node-suez",
+      "chain_id": "chain-electronics",
+      "name": "Suez Canal Transit",
+      "role": "shipping_chokepoint",
+      "lat": 30.5,
+      "lng": 32.3,
+      "country": "Egypt",
+      "risk_level": "high",
+      "sort_order": 3
+    },
+    {
+      "id": "node-rotterdam",
+      "chain_id": "chain-electronics",
+      "name": "Rotterdam Port",
+      "role": "european_distribution",
+      "lat": 51.9,
+      "lng": 4.5,
+      "country": "Netherlands",
+      "risk_level": "normal",
+      "sort_order": 4
+    },
+    {
+      "id": "node-us",
+      "chain_id": "chain-electronics",
+      "name": "US Distribution Center",
+      "role": "north_american_distribution",
+      "lat": 40.7,
+      "lng": -74.0,
+      "country": "United States",
+      "risk_level": "normal",
+      "sort_order": 5
+    }
+  ],
+  "fallbacks": [
+    {
+      "id": "fb-video",
+      "endpoint": "analyze-video",
+      "input_hash": "default",
+      "response": "{\"events\": [{\"title\": \"Taiwan Strait Tensions Escalate\", \"lat\": 24.5, \"lng\": 121.5, \"severity\": \"critical\", \"confidence\": 94, \"video_timestamp\": 8.0}]}"
+    },
+    {
+      "id": "fb-scenario",
+      "endpoint": "simulate-scenario",
+      "input_hash": "default",
+      "response": "{\"impact_chain\": [{\"node\": \"TSMC Fab 18\", \"impact\": \"Production halt\", \"severity\": 95}, {\"node\": \"Vietnam Assembly\", \"impact\": \"3-6 week delay\", \"severity\": 70}], \"overall_risk\": \"critical\"}"
+    },
+    {
+      "id": "fb-brief",
+      "endpoint": "generate-brief",
+      "input_hash": "default",
+      "response": "{\"executive_summary\": \"Critical supply chain disruption detected. Taiwan strait tensions pose immediate risk to semiconductor supply.\", \"risk_matrix\": [], \"recommendations\": \"Diversify chip sourcing. Pre-order 90-day buffer stock. Activate alternative shipping routes via Cape of Good Hope.\"}"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-severity-low: #22c55e;
+  --color-severity-medium: #eab308;
+  --color-severity-high: #f97316;
+  --color-severity-critical: #ef4444;
+  --color-supply-chain-arc: #d97706;
+}
+
+body {
+  background: #0a0a0a;
+  color: #e5e5e5;
+}
