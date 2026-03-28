@@ -52,7 +52,7 @@ export default function EventCard({ event, onClose }: EventCardProps) {
           <p className="text-[10px] font-label text-slate-500 uppercase tracking-wider">Source</p>
           <p className="data-mono text-sm text-slate-200 capitalize">{event.source_type}</p>
         </div>
-        {event.video_timestamp != null && (
+        {event.video_timestamp != null && event.source_type === 'video' && (
           <div>
             <p className="text-[10px] font-label text-slate-500 uppercase tracking-wider">Video time</p>
             <p className="data-mono text-sm text-slate-200">{event.video_timestamp.toFixed(1)}s</p>

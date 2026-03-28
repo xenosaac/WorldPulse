@@ -28,6 +28,26 @@ export default function Home() {
     setScenarioResult(null);
     setBriefComplete(false);
   };
+
+  const handleScenarioResult = (result: ScenarioResult) => {
+    setScenarioResult(result);
+    // Update node risk levels from scenario impact chain
+    if (chain && Array.isArray(result.impact_chain)) {
+      const updatedNodes = chain.nodes.map((node) => {
+        const impact = (result.impact_chain as any[]).find(
+          (item) => item.node_name === node.name || item.node === node.name
+        );
+        if (impact) {
+          const severity = (impact.impact_severity || '').toLowerCase();
+          const riskMap: Record<string, string> = { critical: 'critical', high: 'high', elevated: 'elevated' };
+          return { ...node, risk_level: riskMap[severity] || 'normal' };
+        }
+        return node;
+      });
+      setChain({ ...chain, nodes: updatedNodes });
+    }
+  };
+
   const [muted, setMuted] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -77,7 +97,7 @@ export default function Home() {
               <>
                 <MacroIndicators />
                 <EventTimeline events={events} onEventClick={setSelectedEvent} selectedEvent={selectedEvent} />
-                <ScenarioPanel chainId={chain.id} onResult={setScenarioResult} />
+                <ScenarioPanel chainId={chain.id} onResult={handleScenarioResult} />
                 <RiskBrief
                   chainId={chain.id}
                   scenarioId={scenarioResult?.id || null}

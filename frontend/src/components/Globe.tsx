@@ -71,21 +71,14 @@ export default function Globe({ events, supplyChainNodes, selectedEvent, onEvent
     event: e,
   }));
 
-  const arcsData = [...supplyChainNodes]
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .slice(0, -1)
-    .map((node, i) => {
-      const next = supplyChainNodes.find((n) => n.sort_order === node.sort_order + 1);
-      if (!next) return null;
-      return {
-        startLat: node.lat,
-        startLng: node.lng,
-        endLat: next.lat,
-        endLng: next.lng,
-        color: [RISK_COLORS[node.risk_level] || '#2dd4bf', RISK_COLORS[next.risk_level] || '#2dd4bf'],
-      };
-    })
-    .filter((a): a is NonNullable<typeof a> => a !== null);
+  const sortedNodes = [...supplyChainNodes].sort((a, b) => a.sort_order - b.sort_order);
+  const arcsData = sortedNodes.slice(0, -1).map((node, i) => ({
+    startLat: node.lat,
+    startLng: node.lng,
+    endLat: sortedNodes[i + 1].lat,
+    endLng: sortedNodes[i + 1].lng,
+    color: [RISK_COLORS[node.risk_level] || '#2dd4bf', RISK_COLORS[sortedNodes[i + 1].risk_level] || '#2dd4bf'],
+  }));
 
   const handlePointClick = useCallback(
     (point: any) => {
