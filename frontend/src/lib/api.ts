@@ -61,14 +61,11 @@ export async function getBrief(id: string): Promise<RiskBrief> {
   return res.json();
 }
 
-export async function addSupplyChainNode(
-  chainId: string,
-  node: { name: string; role?: string; lat?: number; lng?: number; country?: string; risk_level?: string }
-): Promise<any> {
+export async function addSupplyChainNode(chainId: string, name: string): Promise<any> {
   const res = await fetch(`/api/supply-chains/${chainId}/nodes`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(node),
+    body: JSON.stringify({ name }),
   });
   if (!res.ok) throw new Error('Failed to add node');
   return res.json();

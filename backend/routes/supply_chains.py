@@ -1,9 +1,12 @@
+import asyncio
+import json
 import uuid
 from contextlib import closing
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
 import db
+from services import get_gemini_client
 
 router = APIRouter(prefix="/api")
 
@@ -26,11 +29,36 @@ async def list_supply_chains():
 
 class AddNodeRequest(BaseModel):
     name: str = Field(..., max_length=200)
-    role: str = Field("custom", max_length=100)
-    lat: float = Field(0.0)
-    lng: float = Field(0.0)
-    country: Optional[str] = Field(None, max_length=100)
-    risk_level: str = Field("normal", max_length=20)
+
+
+async def geocode_location(name: str) -> dict:
+    """Use Gemini to resolve a location name to lat/lng/country."""
+    try:
+        client = get_gemini_client()
+        from google.genai import types
+
+        def _call():
+            return client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=[f'Return the geographic coordinates for "{name}" as JSON: {{"lat": number, "lng": number, "country": "string", "role": "string description of this place in supply chain context"}}. Be precise. Return ONLY the JSON object.'],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    temperature=0.1,
+                ),
+            )
+
+        response = await asyncio.to_thread(_call)
+        if response.text:
+            data = json.loads(response.text)
+            return {
+                "lat": float(data.get("lat", 0)),
+                "lng": float(data.get("lng", 0)),
+                "country": data.get("country", ""),
+                "role": data.get("role", "custom"),
+            }
+    except Exception:
+        pass
+    return {"lat": 0, "lng": 0, "country": "", "role": "custom"}
 
 
 @router.post("/supply-chains/{chain_id}/nodes")
@@ -44,17 +72,21 @@ async def add_node(chain_id: str, req: AddNodeRequest):
             "SELECT MAX(sort_order) FROM supply_chain_nodes WHERE chain_id = ?", (chain_id,)
         ).fetchone()[0] or 0
 
-        node_id = f"node-{uuid.uuid4().hex[:8]}"
+    # Geocode the location name using Gemini
+    geo = await geocode_location(req.name)
+
+    node_id = f"node-{uuid.uuid4().hex[:8]}"
+    with closing(db.get_db()) as conn:
         conn.execute(
             """INSERT INTO supply_chain_nodes (id, chain_id, name, role, lat, lng, country, risk_level, sort_order)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (node_id, chain_id, req.name, req.role, req.lat, req.lng, req.country, req.risk_level, max_order + 1),
+            (node_id, chain_id, req.name, geo["role"], geo["lat"], geo["lng"], geo["country"], "normal", max_order + 1),
         )
         conn.commit()
 
-    return {"id": node_id, "chain_id": chain_id, "name": req.name, "role": req.role,
-            "lat": req.lat, "lng": req.lng, "country": req.country,
-            "risk_level": req.risk_level, "sort_order": max_order + 1}
+    return {"id": node_id, "chain_id": chain_id, "name": req.name, "role": geo["role"],
+            "lat": geo["lat"], "lng": geo["lng"], "country": geo["country"],
+            "risk_level": "normal", "sort_order": max_order + 1}
 
 
 @router.delete("/supply-chains/nodes/{node_id}")

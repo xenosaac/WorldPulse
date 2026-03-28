@@ -97,7 +97,7 @@
       "lat": 24.8,
       "lng": 120.9,
       "country": "Taiwan",
-      "risk_level": "critical",
+      "risk_level": "normal",
       "sort_order": 1
     },
     {
@@ -108,7 +108,7 @@
       "lat": 10.8,
       "lng": 106.7,
       "country": "Vietnam",
-      "risk_level": "elevated",
+      "risk_level": "normal",
       "sort_order": 2
     },
     {
@@ -119,7 +119,7 @@
       "lat": 30.5,
       "lng": 32.3,
       "country": "Egypt",
-      "risk_level": "high",
+      "risk_level": "normal",
       "sort_order": 3
     },
     {
@@ -152,7 +152,7 @@
       "lat": 26.6,
       "lng": 50.2,
       "country": "Saudi Arabia",
-      "risk_level": "elevated",
+      "risk_level": "normal",
       "sort_order": 1
     },
     {
@@ -163,7 +163,7 @@
       "lat": 26.6,
       "lng": 56.3,
       "country": "Iran",
-      "risk_level": "high",
+      "risk_level": "normal",
       "sort_order": 2
     },
     {
@@ -174,7 +174,7 @@
       "lat": 30.5,
       "lng": 32.3,
       "country": "Egypt",
-      "risk_level": "high",
+      "risk_level": "normal",
       "sort_order": 3
     },
     {
@@ -253,9 +253,9 @@
       "response": {
         "executive_summary": "Critical supply chain disruption detected across the Asia-Pacific corridor. Three concurrent threat vectors — Taiwan strait military exercises, Suez Canal blockage, and Red Sea attacks — create compounding risk to the global electronics supply chain.\n\nImmediate impact: TSMC advanced chip fabrication at risk of complete halt, affecting 90% of global sub-7nm semiconductor production. Secondary impacts cascade through Vietnam assembly operations and European/US distribution within 4-8 weeks.\n\nRecommended posture: DEFCON 2 supply chain alert. Activate buffer stock protocols, diversify sourcing, and pre-authorize Cape of Good Hope routing for all Asia-Europe shipments.",
         "risk_matrix": [
-          {"node_name": "TSMC Fab 18", "risk_level": "critical", "primary_threat": "Taiwan strait military exercises — direct proximity to fabrication facility", "mitigation": "Activate Samsung/Intel backup qualification; accelerate 90-day chip buffer procurement"},
-          {"node_name": "Vietnam Assembly Hub", "risk_level": "elevated", "primary_threat": "Worker strike + upstream chip shortage creates dual disruption", "mitigation": "Negotiate strike resolution; shift overflow to India Foxconn facility"},
-          {"node_name": "Suez Canal Transit", "risk_level": "high", "primary_threat": "Vessel grounding blocks transit; Red Sea attacks deter alternate routing", "mitigation": "Pre-authorize Cape of Good Hope routing; air freight critical components"},
+          {"node_name": "TSMC Fab 18", "risk_level": "normal", "primary_threat": "Taiwan strait military exercises — direct proximity to fabrication facility", "mitigation": "Activate Samsung/Intel backup qualification; accelerate 90-day chip buffer procurement"},
+          {"node_name": "Vietnam Assembly Hub", "risk_level": "normal", "primary_threat": "Worker strike + upstream chip shortage creates dual disruption", "mitigation": "Negotiate strike resolution; shift overflow to India Foxconn facility"},
+          {"node_name": "Suez Canal Transit", "risk_level": "normal", "primary_threat": "Vessel grounding blocks transit; Red Sea attacks deter alternate routing", "mitigation": "Pre-authorize Cape of Good Hope routing; air freight critical components"},
           {"node_name": "Rotterdam Port", "risk_level": "normal", "primary_threat": "Delayed shipments from Asia reduce throughput", "mitigation": "Draw down 30-day inventory buffer; activate Piraeus as alternate EU entry"},
           {"node_name": "US Distribution Center", "risk_level": "normal", "primary_threat": "4-8 week semiconductor shortage impacts consumer electronics", "mitigation": "Priority allocation to defense and automotive; delay non-critical product launches"}
         ],

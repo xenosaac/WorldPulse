@@ -26,7 +26,7 @@ export default function Home() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const { visibleEvents, isPlaying } = useVideoSync(events, videoRef);
-  const { status: geminiStatus } = useGeminiLive();
+  const { status: geminiStatus, connect, disconnect, startScenario, isConnected } = useGeminiLive();
 
   return (
     <ToastProvider>
@@ -65,14 +65,52 @@ export default function Home() {
           <nav className="flex-1 overflow-y-auto px-6 space-y-1 pb-8">
             <VideoAnalysis events={events} onEventDetected={addEvent} onAnalysisComplete={refresh} />
             <SupplyChain onChainLoaded={setChain} />
-            <MacroIndicators />
-            <EventTimeline events={events} onEventClick={setSelectedEvent} selectedEvent={selectedEvent} />
-            <ScenarioPanel chainId={chain?.id || null} onResult={setScenarioResult} />
-            <RiskBrief
-              chainId={chain?.id || null}
-              scenarioId={scenarioResult?.id || null}
-              onBriefComplete={() => setBriefComplete(true)}
-            />
+
+            {/* Only show these after supply chain loads */}
+            {chain && (
+              <>
+                <MacroIndicators />
+                <EventTimeline events={events} onEventClick={setSelectedEvent} selectedEvent={selectedEvent} />
+                <ScenarioPanel chainId={chain.id} onResult={setScenarioResult} />
+                <RiskBrief
+                  chainId={chain.id}
+                  scenarioId={scenarioResult?.id || null}
+                  onBriefComplete={() => setBriefComplete(true)}
+                />
+
+                {/* Voice / Live API */}
+                <section className="space-y-2 pt-3">
+                  <span className="text-xs font-light text-slate-300">Voice assistant</span>
+                  {!isConnected ? (
+                    <button
+                      onClick={connect}
+                      className="w-full py-2 border border-primary text-primary text-[10px] font-label font-medium tracking-widest uppercase rounded hover:bg-primary/5 transition-colors"
+                    >
+                      Connect Gemini Live
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary teal-pulse" />
+                        <span className="text-[10px] text-primary">Connected</span>
+                      </div>
+                      <button
+                        onClick={() => startScenario(chain.id)}
+                        className="w-full py-2 bg-primary/10 text-primary text-[10px] font-label rounded hover:bg-primary/20 transition-colors"
+                      >
+                        Voice scenario
+                      </button>
+                      <button
+                        onClick={disconnect}
+                        className="w-full py-1.5 text-slate-500 text-[10px] font-label rounded hover:text-slate-300 transition-colors"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
+                  )}
+                </section>
+              </>
+            )}
           </nav>
         </aside>
 
