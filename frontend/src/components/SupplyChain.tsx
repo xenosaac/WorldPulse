@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import type { SupplyChain as SupplyChainType } from '@/lib/types';
 import { getSupplyChains, addSupplyChainNode, deleteSupplyChainNode } from '@/lib/api';
+import { useToast } from '@/components/Toast';
 
 interface SupplyChainProps {
   onChainLoaded: (chain: SupplyChainType) => void;
@@ -22,6 +23,7 @@ const RISK_COLORS: Record<string, string> = {
 };
 
 export default function SupplyChain({ onChainLoaded }: SupplyChainProps) {
+  const { toast } = useToast();
   const [chains, setChains] = useState<SupplyChainType[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [showAdd, setShowAdd] = useState(false);
@@ -57,8 +59,8 @@ export default function SupplyChain({ onChainLoaded }: SupplyChainProps) {
       setNewName('');
       setShowAdd(false);
       await refreshChains();
-    } catch (err) {
-      console.error('Failed to add node:', err);
+    } catch {
+      toast('Failed to add node. Check your connection.', 'error');
     } finally {
       setAdding(false);
     }

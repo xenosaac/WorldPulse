@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import uuid
 from contextlib import closing
 from fastapi import APIRouter, HTTPException
@@ -7,6 +8,8 @@ from pydantic import BaseModel, Field
 from typing import Optional
 import db
 from services import get_gemini_client
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -39,11 +42,12 @@ async def geocode_location(name: str) -> dict:
 
         def _call():
             return client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-2.5-flash",
                 contents=[f'Return the geographic coordinates for "{name}" as JSON: {{"lat": number, "lng": number, "country": "string", "role": "string description of this place in supply chain context"}}. Be precise. Return ONLY the JSON object.'],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.1,
+                    http_options=types.HttpOptions(timeout=30),
                 ),
             )
 
@@ -56,8 +60,8 @@ async def geocode_location(name: str) -> dict:
                 "country": data.get("country", ""),
                 "role": data.get("role", "custom"),
             }
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Geocode failed for '%s': %s", name, e)
     return {"lat": 0, "lng": 0, "country": "", "role": "custom"}
 
 
