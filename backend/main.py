@@ -1,8 +1,6 @@
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
 load_dotenv()
 
 from routes.events import router as events_router
@@ -14,13 +12,8 @@ import db
 
 app = FastAPI(title="World Pulse API", version="0.1.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# No CORS needed — Next.js proxies /api/* and /ws/* to this server.
+# Everything runs through localhost:3000 as a single app.
 
 app.include_router(events_router)
 app.include_router(supply_chains_router)
