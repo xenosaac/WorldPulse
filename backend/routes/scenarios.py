@@ -111,7 +111,11 @@ async def simulate_scenario(req: ScenarioRequest):
         result = await gemini_batch.simulate_scenario(req.scenario_input, supply_chain)
     except Exception as e:
         logger.warning("Gemini scenario failed, using fallback: %s", e)
-        fallback = get_fallback("simulate-scenario", input_hash=req.chain_id)
+        fallback = get_fallback(
+            "simulate-scenario",
+            input_hash=req.chain_id,
+            allow_generic=False,
+        )
         if fallback:
             result = fallback
         else:

@@ -64,7 +64,11 @@ async def generate_brief(req: BriefRequest):
         result = await gemini_batch.generate_brief(events, supply_chain, scenario)
     except Exception as e:
         logger.warning("Gemini brief failed, using fallback: %s", e)
-        fallback = get_fallback("generate-brief", input_hash=req.chain_id)
+        fallback = get_fallback(
+            "generate-brief",
+            input_hash=req.chain_id,
+            allow_generic=False,
+        )
         if fallback:
             result = fallback
         else:

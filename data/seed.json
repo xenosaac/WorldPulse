@@ -217,7 +217,7 @@
     {
       "id": "fb-scenario",
       "endpoint": "simulate-scenario",
-      "input_hash": null,
+      "input_hash": "chain-electronics",
       "response": {
         "impact_chain": [
           {"node_name": "TSMC Fab 18", "impact_severity": "critical", "impact_description": "Complete production halt. Advanced node (3nm/5nm) fabrication ceases immediately.", "timeline": "0-48 hours", "alternative_options": "Samsung Pyeongtaek (limited capacity), Intel Foundry (18-month qualification)", "cost_change_percent": 340},
@@ -249,15 +249,15 @@
     {
       "id": "fb-brief",
       "endpoint": "generate-brief",
-      "input_hash": null,
+      "input_hash": "chain-electronics",
       "response": {
         "executive_summary": "Critical supply chain disruption detected across the Asia-Pacific corridor. Three concurrent threat vectors — Taiwan strait military exercises, Suez Canal blockage, and Red Sea attacks — create compounding risk to the global electronics supply chain.\n\nImmediate impact: TSMC advanced chip fabrication at risk of complete halt, affecting 90% of global sub-7nm semiconductor production. Secondary impacts cascade through Vietnam assembly operations and European/US distribution within 4-8 weeks.\n\nRecommended posture: DEFCON 2 supply chain alert. Activate buffer stock protocols, diversify sourcing, and pre-authorize Cape of Good Hope routing for all Asia-Europe shipments.",
         "risk_matrix": [
-          {"node_name": "TSMC Fab 18", "risk_level": "normal", "primary_threat": "Taiwan strait military exercises — direct proximity to fabrication facility", "mitigation": "Activate Samsung/Intel backup qualification; accelerate 90-day chip buffer procurement"},
-          {"node_name": "Vietnam Assembly Hub", "risk_level": "normal", "primary_threat": "Worker strike + upstream chip shortage creates dual disruption", "mitigation": "Negotiate strike resolution; shift overflow to India Foxconn facility"},
-          {"node_name": "Suez Canal Transit", "risk_level": "normal", "primary_threat": "Vessel grounding blocks transit; Red Sea attacks deter alternate routing", "mitigation": "Pre-authorize Cape of Good Hope routing; air freight critical components"},
-          {"node_name": "Rotterdam Port", "risk_level": "normal", "primary_threat": "Delayed shipments from Asia reduce throughput", "mitigation": "Draw down 30-day inventory buffer; activate Piraeus as alternate EU entry"},
-          {"node_name": "US Distribution Center", "risk_level": "normal", "primary_threat": "4-8 week semiconductor shortage impacts consumer electronics", "mitigation": "Priority allocation to defense and automotive; delay non-critical product launches"}
+          {"node_name": "TSMC Fab 18", "risk_level": "critical", "primary_threat": "Taiwan strait military exercises — direct proximity to fabrication facility", "mitigation": "Activate Samsung/Intel backup qualification; accelerate 90-day chip buffer procurement"},
+          {"node_name": "Vietnam Assembly Hub", "risk_level": "high", "primary_threat": "Worker strike + upstream chip shortage creates dual disruption", "mitigation": "Negotiate strike resolution; shift overflow to India Foxconn facility"},
+          {"node_name": "Suez Canal Transit", "risk_level": "critical", "primary_threat": "Vessel grounding blocks transit; Red Sea attacks deter alternate routing", "mitigation": "Pre-authorize Cape of Good Hope routing; air freight critical components"},
+          {"node_name": "Rotterdam Port", "risk_level": "elevated", "primary_threat": "Delayed shipments from Asia reduce throughput", "mitigation": "Draw down 30-day inventory buffer; activate Piraeus as alternate EU entry"},
+          {"node_name": "US Distribution Center", "risk_level": "elevated", "primary_threat": "4-8 week semiconductor shortage impacts consumer electronics", "mitigation": "Priority allocation to defense and automotive; delay non-critical product launches"}
         ],
         "scenario_analysis": "The convergence of three simultaneous disruptions is historically unprecedented. Each individual event would be manageable — together they create a cascading failure mode. The Taiwan strait exercises are the highest-leverage risk: a single escalation could halt TSMC output entirely, with no adequate short-term substitute at scale. The Suez/Red Sea disruptions amplify transit risk but can be mitigated via Cape routing at 12-14 day delay penalty.",
         "recommendations": [
@@ -277,6 +277,37 @@
           "Lloyd's of London war risk insurance premiums for Red Sea transit"
         ],
         "full_report": "# World Pulse Intelligence Brief\n\n## Situation Overview\nThree concurrent geopolitical disruptions are impacting the global electronics supply chain...\n\n## Risk Assessment\nOverall risk level: **CRITICAL**\n\n## Recommendations\nSee executive summary for immediate action items.\n\n## Monitoring\nNext assessment scheduled in 24 hours."
+      }
+    },
+    {
+      "id": "fb-brief-energy",
+      "endpoint": "generate-brief",
+      "input_hash": "chain-energy",
+      "response": {
+        "executive_summary": "The Europe-bound energy chain is under acute stress from the Suez Canal blockage and persistent Red Sea missile attacks. These events are constraining the primary shipping corridor from Gulf production sites to Mediterranean and Northwest European refining hubs, forcing reroutes around the Cape of Good Hope and materially increasing transit times, insurance premiums, and delivered crude costs.\n\nImmediate exposure is highest at Suez transit and downstream European refining. While Saudi production remains online, logistics friction is enough to tighten refinery feedstock availability within weeks. Recommended posture: activate alternate routing plans, secure non-Suez crude volumes, and prepare strategic inventory drawdown if transit disruption extends.",
+        "risk_matrix": [
+          {"node_name": "Saudi Aramco Ras Tanura", "risk_level": "elevated", "primary_threat": "Export flow disruption from Red Sea and Suez downstream chokepoints", "mitigation": "Pre-book alternate tanker capacity and diversify destination routing via non-Suez lanes"},
+          {"node_name": "Strait of Hormuz", "risk_level": "elevated", "primary_threat": "Regional security spillover raises war-risk premiums and transit sensitivity", "mitigation": "Secure naval-escort clauses and evaluate East-West pipeline contingencies"},
+          {"node_name": "Suez Canal Transit", "risk_level": "critical", "primary_threat": "Physical blockage plus regional attack risk halts normal canal throughput", "mitigation": "Authorize Cape rerouting and prioritize high-margin cargoes for protected transit"},
+          {"node_name": "Mediterranean Shipping Lane", "risk_level": "high", "primary_threat": "Reduced tanker flow and elongated voyage times create capacity bottlenecks", "mitigation": "Stage replacement supply contracts from North Africa and increase schedule buffers"},
+          {"node_name": "Rotterdam Europoort Refinery", "risk_level": "high", "primary_threat": "Delayed crude arrivals threaten refinery throughput and margin stability", "mitigation": "Activate spot purchases, optimize run rates, and coordinate reserve-backed inventory coverage"}
+        ],
+        "scenario_analysis": "The energy chain is currently facing a logistics-led disruption rather than a production-led collapse. Suez and Red Sea stress propagate downstream into Mediterranean routing and Rotterdam refining first, with Gulf export nodes remaining operational but increasingly exposed to premium inflation and schedule volatility.",
+        "recommendations": [
+          "Pre-authorize Cape of Good Hope routing for cargoes unable to clear Suez safely",
+          "Lock in contingency crude purchases from North Africa and Atlantic Basin suppliers",
+          "Increase refinery feedstock buffers at Rotterdam and nearby storage terminals",
+          "Track war-risk insurance and tanker charter spreads as early cost-pressure indicators",
+          "Coordinate with trading desks on reserve-release thresholds if delays exceed two weeks"
+        ],
+        "key_indicators": [
+          "Suez Canal daily transit count",
+          "Red Sea war-risk insurance premiums",
+          "VLCC and Aframax charter rates",
+          "Rotterdam crude inventory days on hand",
+          "Brent-Dubai spread and Mediterranean refining margins"
+        ],
+        "full_report": "# World Pulse Energy Brief\n\n## Situation Overview\nSuez blockage and Red Sea security threats are disrupting Europe-bound crude flows.\n\n## Risk Assessment\nOverall risk level: **HIGH** with `critical` exposure at Suez transit.\n\n## Recommendations\nAccelerate rerouting, secure alternate supply, and protect refinery inventory buffers.\n\n## Monitoring\nReview shipping and insurance indicators every 12 hours."
       }
     }
   ]

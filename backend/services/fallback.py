@@ -3,7 +3,12 @@ from contextlib import closing
 import db
 
 
-def get_fallback(endpoint: str, input_hash: str | None = None) -> dict | None:
+def get_fallback(
+    endpoint: str,
+    input_hash: str | None = None,
+    *,
+    allow_generic: bool = True,
+) -> dict | None:
     """Query the fallbacks table by endpoint (and optional input_hash) and return parsed JSON response, or None."""
     with closing(db.get_db()) as conn:
         # Try input-specific fallback first
@@ -17,6 +22,9 @@ def get_fallback(endpoint: str, input_hash: str | None = None) -> dict | None:
                     return json.loads(row["response"])
                 except (json.JSONDecodeError, TypeError):
                     pass
+
+        if not allow_generic:
+            return None
 
         # Fall back to generic (NULL input_hash) match
         row = conn.execute(

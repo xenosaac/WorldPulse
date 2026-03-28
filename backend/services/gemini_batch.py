@@ -18,9 +18,20 @@ VIDEO_MODEL = "gemini-2.5-flash"
 SCENARIO_MODEL = "gemini-3-flash-preview"
 BRIEF_MODEL = "gemini-3-flash-preview"
 
+REQUEST_TIMEOUT_MS = 20_000
+
 # SDK-level timeout so the actual HTTP request is cancelled (not just the
 # coroutine wrapper, which is what asyncio.wait_for does with to_thread).
-_TIMEOUT = types.HttpOptions(timeout=30)
+# The SDK expects milliseconds here, not seconds.
+REQUEST_HTTP_OPTIONS = types.HttpOptions(
+    timeout=REQUEST_TIMEOUT_MS,
+    retry_options=types.HttpRetryOptions(
+        attempts=3,
+        initial_delay=0.5,
+        max_delay=2.0,
+        jitter=0.1,
+    ),
+)
 
 
 class GeminiParseError(Exception):
@@ -121,7 +132,7 @@ Be specific about geographic locations. Extract 3-7 events from typical news foo
 
 
 async def analyze_video(file_uri: str) -> list[dict]:
-    """Analyze a video (GCS URI or YouTube URL) using Gemini 2.0 Flash. Returns extracted events."""
+    """Analyze a video (GCS URI or YouTube URL) using Gemini 2.5 Flash."""
     client = get_gemini_client()
 
     is_youtube = file_uri.startswith("https://") or file_uri.startswith("http://")
@@ -143,7 +154,7 @@ async def analyze_video(file_uri: str) -> list[dict]:
                 response_mime_type="application/json",
                 response_schema=VideoAnalysisSchema,
                 temperature=0.3,
-                http_options=_TIMEOUT,
+                http_options=REQUEST_HTTP_OPTIONS,
             ),
         )
 
@@ -214,7 +225,7 @@ async def simulate_scenario(scenario_input: str, supply_chain: dict) -> dict:
                 response_schema=ScenarioResultSchema,
                 temperature=0.4,
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                http_options=_TIMEOUT,
+                http_options=REQUEST_HTTP_OPTIONS,
             ),
         )
 
@@ -271,7 +282,7 @@ Write in professional analyst tone. Return as JSON with keys:
 async def generate_brief(
     events: list, supply_chain: dict, scenario: dict | None = None
 ) -> dict:
-    """Generate a comprehensive risk brief using Gemini 2.5 Flash."""
+    """Generate a comprehensive risk brief using Gemini 3 Flash."""
     client = get_gemini_client()
 
     scenario_section = ""
@@ -292,7 +303,7 @@ async def generate_brief(
                 response_mime_type="application/json",
                 response_schema=BriefSchema,
                 temperature=0.5,
-                http_options=_TIMEOUT,
+                http_options=REQUEST_HTTP_OPTIONS,
             ),
         )
 
