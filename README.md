@@ -49,11 +49,13 @@ pip install -r requirements.txt
 python seed.py                 # Seed database with demo data
 uvicorn main:app --reload      # Starts on http://localhost:8000
 
-# 3. Frontend (new terminal)
+# 3. Desktop App (new terminal)
 cd frontend
 npm install
-npm run dev                    # Starts on http://localhost:3000
+npm run desktop                # Launches native macOS app
 ```
+
+> `npm run desktop` starts Next.js and opens Electron automatically. No browser needed.
 
 ### Verify
 ```bash
