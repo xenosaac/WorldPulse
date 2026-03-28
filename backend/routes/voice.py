@@ -109,7 +109,7 @@ async def voice_ws(websocket: WebSocket):
                 try:
                     audio_bytes = base64.b64decode(data)
                     await session.send_realtime_input(
-                        audio=types.Blob(data=audio_bytes, mime_type="audio/webm"),
+                        audio=types.Blob(data=audio_bytes, mime_type="audio/pcm"),
                     )
                 except Exception:
                     pass

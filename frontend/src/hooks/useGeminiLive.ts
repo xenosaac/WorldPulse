@@ -10,6 +10,14 @@ interface ToolCallEvent {
   args: Record<string, unknown>;
 }
 
+/** State for raw PCM mic capture via Web Audio API. */
+interface PcmCapture {
+  stream: MediaStream;
+  ctx: AudioContext;
+  source: MediaStreamAudioSourceNode;
+  processor: ScriptProcessorNode;
+}
+
 export function useGeminiLive() {
   const [isConnected, setIsConnected] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -17,72 +25,83 @@ export function useGeminiLive() {
   const [status, setStatus] = useState<GeminiLiveStatus>('idle');
   const [toolCalls, setToolCalls] = useState<ToolCallEvent[]>([]);
   const wsRef = useRef<WebSocket | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const captureRef = useRef<PcmCapture | null>(null);
+  const playbackCtxRef = useRef<AudioContext | null>(null);
 
+  // ── Playback: raw PCM 16-bit LE mono from Gemini (24 kHz output) ──────────
   const playAudioChunk = useCallback((base64: string) => {
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
+      if (!playbackCtxRef.current || playbackCtxRef.current.state === 'closed') {
+        playbackCtxRef.current = new AudioContext({ sampleRate: 24000 });
       }
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      audioContextRef.current
-        .decodeAudioData(bytes.buffer.slice(0))
-        .then((audioBuffer) => {
-          const source = audioContextRef.current!.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(audioContextRef.current!.destination);
-          source.start();
-        })
-        .catch(() => {
-          /* ignore decode errors for raw PCM chunks */
-        });
+      const ctx = playbackCtxRef.current;
+      const raw = atob(base64);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+
+      const int16 = new Int16Array(bytes.buffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768;
+
+      const buf = ctx.createBuffer(1, float32.length, 24000);
+      buf.getChannelData(0).set(float32);
+      const src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.connect(ctx.destination);
+      src.start();
     } catch {
-      /* ignore */
+      /* ignore decode errors */
     }
   }, []);
 
+  // ── Send audio chunk over WebSocket ───────────────────────────────────────
   const sendAudio = useCallback((audioData: string) => {
     if (wsRef.current?.readyState !== WebSocket.OPEN) return;
     wsRef.current.send(JSON.stringify({ type: 'audio', data: audioData }));
   }, []);
 
+  // ── Stop mic capture ──────────────────────────────────────────────────────
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+    const cap = captureRef.current;
+    if (cap) {
+      cap.processor.disconnect();
+      cap.source.disconnect();
+      cap.stream.getTracks().forEach((t) => t.stop());
+      cap.ctx.close().catch(() => {});
     }
-    mediaRecorderRef.current = null;
+    captureRef.current = null;
     setIsRecording(false);
   }, []);
 
+  // ── Start mic: capture raw 16-bit PCM at 16 kHz ──────────────────────────
   const startRecording = useCallback(async () => {
     if (isRecording) return;
-
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorderRef.current = mediaRecorder;
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true },
+      });
 
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0) {
-          const buffer = await event.data.arrayBuffer();
-          const bytes = new Uint8Array(buffer);
-          let binary = '';
-          for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-          sendAudio(btoa(binary));
+      const ctx = new AudioContext({ sampleRate: 16000 });
+      const source = ctx.createMediaStreamSource(stream);
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+
+      processor.onaudioprocess = (e) => {
+        const f32 = e.inputBuffer.getChannelData(0);
+        const pcm = new Int16Array(f32.length);
+        for (let i = 0; i < f32.length; i++) {
+          const s = Math.max(-1, Math.min(1, f32[i]));
+          pcm[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
         }
+        const bytes = new Uint8Array(pcm.buffer);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        sendAudio(btoa(bin));
       };
 
-      mediaRecorder.onstop = () => {
-        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-        mediaRecorderRef.current = null;
-        setIsRecording(false);
-      };
+      source.connect(processor);
+      processor.connect(ctx.destination); // required for onaudioprocess to fire
 
-      mediaRecorder.start(250); // send chunks every 250ms
+      captureRef.current = { stream, ctx, source, processor };
       setIsRecording(true);
     } catch (err) {
       console.error('Failed to start recording:', err);
@@ -91,6 +110,7 @@ export function useGeminiLive() {
     }
   }, [isRecording, sendAudio]);
 
+  // ── WebSocket connect ─────────────────────────────────────────────────────
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
@@ -108,7 +128,6 @@ export function useGeminiLive() {
       try {
         msg = JSON.parse(evt.data);
       } catch {
-        console.error('Failed to parse WebSocket message');
         return;
       }
 
@@ -177,7 +196,7 @@ export function useGeminiLive() {
     return () => {
       stopRecording();
       wsRef.current?.close();
-      audioContextRef.current?.close();
+      playbackCtxRef.current?.close();
     };
   }, [stopRecording]);
 

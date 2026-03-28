@@ -47,7 +47,7 @@ async def geocode_location(name: str) -> dict:
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
                     temperature=0.1,
-                    http_options=types.HttpOptions(timeout=30),
+                    http_options=types.HttpOptions(timeout=20_000),
                 ),
             )
 
