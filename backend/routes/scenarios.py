@@ -75,11 +75,20 @@ async def simulate_scenario(req: ScenarioRequest):
         )
         conn.commit()
 
+    # Normalize impact_chain keys for frontend consistency
+    impact_chain = result.get("impact_chain", [])
+    for item in impact_chain:
+        if isinstance(item, dict):
+            if "node_name" not in item:
+                item["node_name"] = item.pop("node", item.pop("name", "Unknown"))
+            if "cost_change_percent" not in item and "cost_change" in item:
+                item["cost_change_percent"] = item.pop("cost_change")
+
     return {
         "id": scenario_id,
         "scenario_input": req.scenario_input,
         "chain_id": req.chain_id,
-        "impact_chain": result.get("impact_chain", []),
+        "impact_chain": impact_chain,
         "overall_risk": result.get("overall_risk", "unknown"),
         "executive_summary": result.get("executive_summary", ""),
         "source": "text",

@@ -56,7 +56,9 @@ CREATE TABLE IF NOT EXISTS risk_briefs (
     scenario_id TEXT REFERENCES scenario_results(id),
     executive_summary TEXT,
     risk_matrix TEXT,
+    scenario_analysis TEXT,
     recommendations TEXT,
+    key_indicators TEXT,
     full_report TEXT,
     created_at TEXT
 );

@@ -73,15 +73,17 @@ async def generate_brief(req: BriefRequest):
     with closing(db.get_db()) as conn:
         conn.execute(
             """INSERT INTO risk_briefs
-               (id, chain_id, scenario_id, executive_summary, risk_matrix, recommendations, full_report, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, chain_id, scenario_id, executive_summary, risk_matrix, scenario_analysis, recommendations, key_indicators, full_report, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 brief_id,
                 req.chain_id,
                 req.scenario_id,
                 result.get("executive_summary", ""),
                 json.dumps(result.get("risk_matrix", [])),
+                result.get("scenario_analysis", ""),
                 json.dumps(result.get("recommendations", [])),
+                json.dumps(result.get("key_indicators", [])),
                 result.get("full_report", ""),
                 now,
             ),
@@ -111,7 +113,7 @@ async def get_brief(brief_id: str):
         if row is None:
             raise HTTPException(status_code=404, detail="Brief not found")
         d = dict(row)
-        for field in ("risk_matrix", "recommendations"):
+        for field in ("risk_matrix", "recommendations", "key_indicators"):
             if d.get(field) and isinstance(d[field], str):
                 try:
                     d[field] = json.loads(d[field])
