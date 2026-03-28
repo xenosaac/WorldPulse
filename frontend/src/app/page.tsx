@@ -22,6 +22,12 @@ export default function Home() {
   const [chain, setChain] = useState<SupplyChainType | null>(null);
   const [scenarioResult, setScenarioResult] = useState<ScenarioResult | null>(null);
   const [briefComplete, setBriefComplete] = useState(false);
+
+  const handleChainLoaded = (newChain: SupplyChainType) => {
+    setChain(newChain);
+    setScenarioResult(null);
+    setBriefComplete(false);
+  };
   const [muted, setMuted] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -64,7 +70,7 @@ export default function Home() {
           {/* Scrollable Panel Stack */}
           <nav className="flex-1 overflow-y-auto px-6 space-y-1 pb-8">
             <VideoAnalysis events={events} onEventDetected={addEvent} onAnalysisComplete={refresh} />
-            <SupplyChain onChainLoaded={setChain} />
+            <SupplyChain onChainLoaded={handleChainLoaded} />
 
             {/* Only show these after supply chain loads */}
             {chain && (

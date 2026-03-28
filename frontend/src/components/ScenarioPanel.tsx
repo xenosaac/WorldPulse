@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { simulateScenario } from '@/lib/api';
 import type { ScenarioResult } from '@/lib/types';
 import { useToast } from '@/components/Toast';
@@ -21,10 +21,15 @@ export default function ScenarioPanel({ chainId, onResult }: ScenarioPanelProps)
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScenarioResult | null>(null);
+  const submittingRef = useRef(false);
+
+  // Clear result when chain changes
+  useEffect(() => { setResult(null); setInput(''); }, [chainId]);
 
   const handleSubmit = async (scenario?: string) => {
     const text = scenario || input.trim();
-    if (!text || !chainId) return;
+    if (!text || !chainId || submittingRef.current) return;
+    submittingRef.current = true;
     setInput(text);
     setLoading(true);
     try {
@@ -35,6 +40,7 @@ export default function ScenarioPanel({ chainId, onResult }: ScenarioPanelProps)
       toast('Scenario simulation failed. Check your connection.', 'error');
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
