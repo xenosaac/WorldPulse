@@ -2,10 +2,11 @@
 
 import json
 import uuid
+from contextlib import closing
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 from typing import Optional
 
 import db
@@ -16,47 +17,41 @@ router = APIRouter(prefix="/api")
 
 
 class BriefRequest(BaseModel):
-    chain_id: str
-    scenario_id: Optional[str] = None
+    chain_id: str = Field(..., max_length=100)
+    scenario_id: Optional[str] = Field(None, max_length=100)
 
 
 @router.post("/generate-brief")
 async def generate_brief(req: BriefRequest):
-    conn = db.get_db()
+    with closing(db.get_db()) as conn:
+        # Load all events
+        events = [dict(r) for r in conn.execute("SELECT * FROM events").fetchall()]
 
-    # Load all events
-    events = [
-        dict(r) for r in conn.execute("SELECT * FROM events").fetchall()
-    ]
-
-    # Load supply chain with nodes
-    chain_row = conn.execute(
-        "SELECT * FROM supply_chains WHERE id = ?", (req.chain_id,)
-    ).fetchone()
-    if chain_row is None:
-        conn.close()
-        return {"error": "Supply chain not found", "chain_id": req.chain_id}
-
-    nodes = conn.execute(
-        "SELECT * FROM supply_chain_nodes WHERE chain_id = ? ORDER BY sort_order",
-        (req.chain_id,),
-    ).fetchall()
-
-    supply_chain = dict(chain_row)
-    supply_chain["nodes"] = [dict(n) for n in nodes]
-
-    # Load scenario if provided
-    scenario = None
-    if req.scenario_id:
-        scn_row = conn.execute(
-            "SELECT * FROM scenario_results WHERE id = ?", (req.scenario_id,)
+        # Load supply chain with nodes
+        chain_row = conn.execute(
+            "SELECT * FROM supply_chains WHERE id = ?", (req.chain_id,)
         ).fetchone()
-        if scn_row:
-            scenario = dict(scn_row)
-            if scenario.get("impact_chain") and isinstance(scenario["impact_chain"], str):
-                scenario["impact_chain"] = json.loads(scenario["impact_chain"])
+        if chain_row is None:
+            raise HTTPException(status_code=404, detail="Supply chain not found")
 
-    conn.close()
+        nodes = conn.execute(
+            "SELECT * FROM supply_chain_nodes WHERE chain_id = ? ORDER BY sort_order",
+            (req.chain_id,),
+        ).fetchall()
+
+        supply_chain = dict(chain_row)
+        supply_chain["nodes"] = [dict(n) for n in nodes]
+
+        # Load scenario if provided
+        scenario = None
+        if req.scenario_id:
+            scn_row = conn.execute(
+                "SELECT * FROM scenario_results WHERE id = ?", (req.scenario_id,)
+            ).fetchone()
+            if scn_row:
+                scenario = dict(scn_row)
+                if scenario.get("impact_chain") and isinstance(scenario["impact_chain"], str):
+                    scenario["impact_chain"] = json.loads(scenario["impact_chain"])
 
     # Call Gemini, fall back to cached response on failure
     try:
@@ -67,28 +62,27 @@ async def generate_brief(req: BriefRequest):
         if fallback:
             result = fallback
         else:
-            return {"error": "Brief generation failed", "detail": str(e)}
+            raise HTTPException(status_code=502, detail=f"Brief generation failed: {e}")
 
     # Save to DB
-    brief_id = f"brief-{uuid.uuid4().hex[:8]}"
-    conn = db.get_db()
-    conn.execute(
-        """INSERT INTO risk_briefs
-           (id, chain_id, scenario_id, executive_summary, risk_matrix, recommendations, full_report, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-        (
-            brief_id,
-            req.chain_id,
-            req.scenario_id,
-            result.get("executive_summary", ""),
-            json.dumps(result.get("risk_matrix", [])),
-            json.dumps(result.get("recommendations", [])),
-            result.get("full_report", ""),
-            datetime.now(timezone.utc).isoformat(),
-        ),
-    )
-    conn.commit()
-    conn.close()
+    brief_id = f"brief-{uuid.uuid4().hex[:12]}"
+    with closing(db.get_db()) as conn:
+        conn.execute(
+            """INSERT INTO risk_briefs
+               (id, chain_id, scenario_id, executive_summary, risk_matrix, recommendations, full_report, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                brief_id,
+                req.chain_id,
+                req.scenario_id,
+                result.get("executive_summary", ""),
+                json.dumps(result.get("risk_matrix", [])),
+                json.dumps(result.get("recommendations", [])),
+                result.get("full_report", ""),
+                datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        conn.commit()
 
     return {
         "id": brief_id,
