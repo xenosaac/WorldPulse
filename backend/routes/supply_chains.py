@@ -78,6 +78,11 @@ async def add_node(chain_id: str, req: AddNodeRequest):
 
     # Geocode the location name using Gemini
     geo = await geocode_location(req.name)
+    if geo["lat"] == 0 and geo["lng"] == 0:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not geocode location. Check your internet connection and try again.",
+        )
 
     node_id = f"node-{uuid.uuid4().hex[:8]}"
     with closing(db.get_db()) as conn:

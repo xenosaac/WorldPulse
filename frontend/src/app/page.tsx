@@ -216,16 +216,44 @@ export default function Home() {
                         </button>
                       </div>
                       {(isRecording || transcript || toolCalls.length > 0) && (
-                        <div className="rounded border border-white/5 bg-slate-800/30 px-3 py-2 space-y-1.5">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-label uppercase text-slate-500">Live trace</span>
-                            <span className="text-[9px] data-mono text-slate-500">
-                              {toolCalls.length} updates
-                            </span>
+                        <div className="rounded border border-white/5 bg-slate-800/30 px-3 py-2 space-y-2">
+                          {/* Transcript */}
+                          <div>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              {isRecording && <div className="w-1.5 h-1.5 rounded-full bg-red-500 teal-pulse" />}
+                              <span className="text-[9px] font-label uppercase text-slate-500">
+                                {isRecording ? 'Listening' : 'Transcript'}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-300 leading-relaxed">
+                              {transcript || (isRecording ? 'Speak your scenario...' : 'Waiting for Gemini...')}
+                            </p>
                           </div>
-                          <p className="text-[10px] text-slate-400 leading-relaxed">
-                            {transcript || (isRecording ? 'Listening for scenario input...' : 'Waiting for Gemini response...')}
-                          </p>
+
+                          {/* Tool call updates */}
+                          {toolCalls.length > 0 && (
+                            <div>
+                              <span className="text-[9px] font-label uppercase text-slate-500">
+                                Risk updates ({toolCalls.length})
+                              </span>
+                              <div className="mt-1 space-y-0.5">
+                                {toolCalls.slice(-5).map((tc, i) => (
+                                  <div key={i} className="flex justify-between items-center">
+                                    <span className="text-[10px] text-slate-400">
+                                      {String(tc.args.node_name || tc.name)}
+                                    </span>
+                                    <span className="text-[9px] data-mono font-bold uppercase" style={{
+                                      color: tc.args.risk_level === 'critical' ? '#ef4444' :
+                                             tc.args.risk_level === 'high' ? '#f97316' :
+                                             tc.args.risk_level === 'elevated' ? '#eab308' : '#22c55e'
+                                    }}>
+                                      {String(tc.args.risk_level || '')}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                       <button

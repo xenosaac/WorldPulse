@@ -80,6 +80,16 @@ export default function Globe({ events, supplyChainNodes, selectedEvent, onEvent
     color: [RISK_COLORS[node.risk_level] || '#2dd4bf', RISK_COLORS[sortedNodes[i + 1].risk_level] || '#2dd4bf'],
   }));
 
+  // Supply chain nodes as visible labeled markers on the globe
+  const labelsData = supplyChainNodes.map((node) => ({
+    lat: node.lat,
+    lng: node.lng,
+    text: node.name.split(' ')[0],
+    color: RISK_COLORS[node.risk_level] || '#2dd4bf',
+    size: 0.6,
+    node,
+  }));
+
   const handlePointClick = useCallback(
     (point: any) => {
       if (point?.event) onEventClick(point.event);
@@ -124,6 +134,16 @@ export default function Globe({ events, supplyChainNodes, selectedEvent, onEvent
           arcDashGap={0.2}
           arcDashAnimateTime={2000}
           arcStroke={0.5}
+          labelsData={labelsData}
+          labelLat="lat"
+          labelLng="lng"
+          labelText="text"
+          labelSize="size"
+          labelColor="color"
+          labelDotRadius={0.3}
+          labelAltitude={0.015}
+          labelResolution={2}
+          labelLabel={(d: any) => `<div style="background:rgba(15,23,42,0.9);backdrop-filter:blur(8px);padding:4px 8px;border-radius:4px;border:1px solid ${d.color}30;font-size:10px;color:${d.color};font-family:Inter,sans-serif"><b>${d.node.name}</b><br/><span style="font-size:8px;text-transform:uppercase;letter-spacing:1px;opacity:0.7">${d.node.risk_level}</span></div>`}
           showGraticules={false}
         />
       )}
