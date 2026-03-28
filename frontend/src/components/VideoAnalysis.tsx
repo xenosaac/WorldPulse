@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import type { Event } from '@/lib/types';
 import { analyzeVideo } from '@/lib/api';
+import { useToast } from '@/components/Toast';
 
 interface VideoAnalysisProps {
   events: Event[];
@@ -10,6 +11,7 @@ interface VideoAnalysisProps {
 }
 
 export default function VideoAnalysis({ events, onEventDetected, onAnalysisComplete }: VideoAnalysisProps) {
+  const { toast } = useToast();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [extracted, setExtracted] = useState(0);
@@ -25,7 +27,7 @@ export default function VideoAnalysis({ events, onEventDetected, onAnalysisCompl
       setExtracted(result.events.length);
       onAnalysisComplete?.();
     } catch (err) {
-      console.error('Video analysis failed:', err);
+      toast('Video analysis failed. Using fallback data.', 'error');
     } finally {
       setLoading(false);
     }

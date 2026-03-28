@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { simulateScenario } from '@/lib/api';
 import type { ScenarioResult } from '@/lib/types';
+import { useToast } from '@/components/Toast';
 
 interface ScenarioPanelProps {
   chainId: string | null;
@@ -16,6 +17,7 @@ const PRESETS = [
 ];
 
 export default function ScenarioPanel({ chainId, onResult }: ScenarioPanelProps) {
+  const { toast } = useToast();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScenarioResult | null>(null);
@@ -30,7 +32,7 @@ export default function ScenarioPanel({ chainId, onResult }: ScenarioPanelProps)
       setResult(res);
       onResult(res);
     } catch (err) {
-      console.error('Scenario simulation failed:', err);
+      toast('Scenario simulation failed. Check your connection.', 'error');
     } finally {
       setLoading(false);
     }

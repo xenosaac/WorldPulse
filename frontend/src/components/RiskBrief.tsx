@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { generateBrief } from '@/lib/api';
 import type { RiskBrief as RiskBriefType } from '@/lib/types';
+import { useToast } from '@/components/Toast';
 
 interface RiskBriefProps {
   chainId: string | null;
@@ -17,6 +18,7 @@ const RISK_COLOR: Record<string, string> = {
 };
 
 export default function RiskBrief({ chainId, scenarioId, onBriefComplete }: RiskBriefProps) {
+  const { toast } = useToast();
   const [brief, setBrief] = useState<RiskBriefType | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -28,7 +30,7 @@ export default function RiskBrief({ chainId, scenarioId, onBriefComplete }: Risk
       setBrief(res);
       onBriefComplete?.();
     } catch (err) {
-      console.error('Brief generation failed:', err);
+      toast('Brief generation failed. Check your connection.', 'error');
     } finally {
       setLoading(false);
     }
