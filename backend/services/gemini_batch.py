@@ -84,7 +84,6 @@ class BriefSchema(BaseModel):
     scenario_analysis: str
     recommendations: list[str]
     key_indicators: list[str]
-    full_report: str
 
 
 def _validate_event(evt: dict) -> dict:
@@ -275,8 +274,8 @@ Produce a risk brief with these sections:
 4. Mitigation Recommendations (prioritized list of 5-7 actions)
 5. Key Indicators to Watch (3-5 metrics/events to monitor going forward)
 
-Write in professional analyst tone. Return as JSON with keys:
-"executive_summary", "risk_matrix" (array of objects), "scenario_analysis", "recommendations" (array of strings), "key_indicators" (array of strings), "full_report" (complete markdown-formatted report)."""
+Write in professional analyst tone. Be concise. Return as JSON with keys:
+"executive_summary", "risk_matrix" (array of objects), "scenario_analysis", "recommendations" (array of strings), "key_indicators" (array of strings)."""
 
 
 async def generate_brief(
@@ -326,5 +325,4 @@ async def generate_brief(
         "scenario_analysis": result.get("scenario_analysis", ""),
         "recommendations": result.get("recommendations", []),
         "key_indicators": result.get("key_indicators", []),
-        "full_report": result.get("full_report", ""),
     }

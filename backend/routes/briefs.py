@@ -27,8 +27,11 @@ class BriefRequest(BaseModel):
 @router.post("/generate-brief")
 async def generate_brief(req: BriefRequest):
     with closing(db.get_db()) as conn:
-        # Load all events
-        events = [dict(r) for r in conn.execute("SELECT * FROM events").fetchall()]
+        # Load events (only fields Gemini needs, skip raw_gemini_response bulk)
+        events = [
+            {k: v for k, v in dict(r).items() if k != "raw_gemini_response"}
+            for r in conn.execute("SELECT * FROM events").fetchall()
+        ]
 
         # Load supply chain with nodes
         chain_row = conn.execute(
