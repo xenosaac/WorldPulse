@@ -1,6 +1,7 @@
 """Scenario simulation endpoint — Gemini analyzes cascading effects on supply chain."""
 
 import json
+import logging
 import uuid
 from contextlib import closing
 from datetime import datetime, timezone
@@ -11,6 +12,8 @@ from pydantic import BaseModel, Field
 import db
 from services import gemini_batch
 from services.fallback import get_fallback
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -44,8 +47,8 @@ async def simulate_scenario(req: ScenarioRequest):
             req.scenario_input, supply_chain
         )
     except Exception as e:
-        print(f"Gemini scenario failed, using fallback: {e}")
-        fallback = get_fallback("simulate-scenario")
+        logger.warning("Gemini scenario failed, using fallback: %s", e)
+        fallback = get_fallback("simulate-scenario", input_hash=req.chain_id)
         if fallback:
             result = fallback
         else:
@@ -53,6 +56,7 @@ async def simulate_scenario(req: ScenarioRequest):
 
     # Save to DB
     scenario_id = f"scn-{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
     with closing(db.get_db()) as conn:
         conn.execute(
             """INSERT INTO scenario_results
@@ -66,7 +70,7 @@ async def simulate_scenario(req: ScenarioRequest):
                 result.get("overall_risk", "unknown"),
                 result.get("gemini_response"),
                 "text",
-                datetime.now(timezone.utc).isoformat(),
+                now,
             ),
         )
         conn.commit()
@@ -78,4 +82,23 @@ async def simulate_scenario(req: ScenarioRequest):
         "impact_chain": result.get("impact_chain", []),
         "overall_risk": result.get("overall_risk", "unknown"),
         "executive_summary": result.get("executive_summary", ""),
+        "source": "text",
+        "created_at": now,
     }
+
+
+@router.get("/scenarios/{scenario_id}")
+async def get_scenario(scenario_id: str):
+    with closing(db.get_db()) as conn:
+        row = conn.execute(
+            "SELECT * FROM scenario_results WHERE id = ?", (scenario_id,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Scenario not found")
+        d = dict(row)
+        if d.get("impact_chain") and isinstance(d["impact_chain"], str):
+            try:
+                d["impact_chain"] = json.loads(d["impact_chain"])
+            except (json.JSONDecodeError, ValueError):
+                d["impact_chain"] = []
+        return d

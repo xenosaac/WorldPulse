@@ -8,16 +8,21 @@ export function useEvents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
+    setLoading(true);
     getEvents()
       .then(setEvents)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   const addEvent = useCallback((event: Event) => {
     setEvents((prev) => [...prev, event]);
   }, []);
 
-  return { events, loading, error, addEvent };
+  return { events, loading, error, addEvent, refresh };
 }

@@ -81,6 +81,11 @@
       "id": "chain-electronics",
       "name": "Electronics Supply Chain (TSMC → US/EU)",
       "description": "Global electronics supply chain from chip fabrication through assembly to distribution"
+    },
+    {
+      "id": "chain-energy",
+      "name": "Energy Supply Chain (Middle East → EU)",
+      "description": "Crude oil supply chain from Gulf production through Suez transit to European refineries"
     }
   ],
   "supply_chain_nodes": [
@@ -138,26 +143,141 @@
       "country": "United States",
       "risk_level": "normal",
       "sort_order": 5
+    },
+    {
+      "id": "node-aramco",
+      "chain_id": "chain-energy",
+      "name": "Saudi Aramco Ras Tanura",
+      "role": "oil_production",
+      "lat": 26.6,
+      "lng": 50.2,
+      "country": "Saudi Arabia",
+      "risk_level": "elevated",
+      "sort_order": 1
+    },
+    {
+      "id": "node-hormuz",
+      "chain_id": "chain-energy",
+      "name": "Strait of Hormuz",
+      "role": "shipping_chokepoint",
+      "lat": 26.6,
+      "lng": 56.3,
+      "country": "Iran",
+      "risk_level": "high",
+      "sort_order": 2
+    },
+    {
+      "id": "node-suez-energy",
+      "chain_id": "chain-energy",
+      "name": "Suez Canal Transit",
+      "role": "shipping_chokepoint",
+      "lat": 30.5,
+      "lng": 32.3,
+      "country": "Egypt",
+      "risk_level": "high",
+      "sort_order": 3
+    },
+    {
+      "id": "node-med",
+      "chain_id": "chain-energy",
+      "name": "Mediterranean Shipping Lane",
+      "role": "transit",
+      "lat": 35.5,
+      "lng": 18.0,
+      "country": "Greece",
+      "risk_level": "normal",
+      "sort_order": 4
+    },
+    {
+      "id": "node-rotterdam-energy",
+      "chain_id": "chain-energy",
+      "name": "Rotterdam Europoort Refinery",
+      "role": "refining_distribution",
+      "lat": 51.9,
+      "lng": 4.1,
+      "country": "Netherlands",
+      "risk_level": "normal",
+      "sort_order": 5
     }
   ],
   "fallbacks": [
     {
       "id": "fb-video",
       "endpoint": "analyze-video",
-      "input_hash": "default",
-      "response": "{\"events\": [{\"title\": \"Taiwan Strait Tensions Escalate\", \"lat\": 24.5, \"lng\": 121.5, \"severity\": \"critical\", \"confidence\": 94, \"video_timestamp\": 8.0}]}"
+      "input_hash": null,
+      "response": {
+        "events": [
+          {"title": "Taiwan Strait Military Exercises", "description": "PLA Eastern Theater Command launches live-fire drills near Taiwan's coast, closing 6 shipping lanes", "lat": 24.5, "lng": 121.5, "severity": "critical", "affected_sectors": ["semiconductors", "shipping", "electronics"], "confidence": 94, "evidence": "PLA press release + satellite imagery from Maxar", "video_timestamp": 5.0},
+          {"title": "Suez Canal Blockage", "description": "Container vessel MV Fortune Star runs aground in southbound lane, blocking transit", "lat": 30.5, "lng": 32.3, "severity": "high", "affected_sectors": ["shipping", "energy", "manufacturing"], "confidence": 88, "evidence": "Suez Canal Authority statement + AIS tracking data", "video_timestamp": 15.0},
+          {"title": "Red Sea Shipping Attack", "description": "Anti-ship missile fired at commercial tanker in Bab el-Mandeb strait", "lat": 13.0, "lng": 43.0, "severity": "high", "affected_sectors": ["shipping", "energy", "insurance"], "confidence": 91, "evidence": "US CENTCOM statement + Lloyd's maritime alert", "video_timestamp": 25.0},
+          {"title": "Vietnam Electronics Workers Strike", "description": "12,000 workers walk off assembly lines at major electronics complex in Ho Chi Minh City", "lat": 10.8, "lng": 106.7, "severity": "medium", "affected_sectors": ["electronics", "manufacturing", "semiconductors"], "confidence": 78, "evidence": "VNExpress report + social media verification", "video_timestamp": 35.0}
+        ]
+      }
     },
     {
       "id": "fb-scenario",
       "endpoint": "simulate-scenario",
-      "input_hash": "default",
-      "response": "{\"impact_chain\": [{\"node\": \"TSMC Fab 18\", \"impact\": \"Production halt\", \"severity\": 95}, {\"node\": \"Vietnam Assembly\", \"impact\": \"3-6 week delay\", \"severity\": 70}], \"overall_risk\": \"critical\"}"
+      "input_hash": null,
+      "response": {
+        "impact_chain": [
+          {"node_name": "TSMC Fab 18", "impact_severity": "critical", "impact_description": "Complete production halt. Advanced node (3nm/5nm) fabrication ceases immediately.", "timeline": "0-48 hours", "alternative_options": "Samsung Pyeongtaek (limited capacity), Intel Foundry (18-month qualification)", "cost_change_percent": 340},
+          {"node_name": "Vietnam Assembly Hub", "impact_severity": "high", "impact_description": "Assembly lines idle within 3-6 weeks as chip inventory depletes.", "timeline": "3-6 weeks", "alternative_options": "India Foxconn Chennai (6-month ramp), Mexico Guadalajara", "cost_change_percent": 85},
+          {"node_name": "Suez Canal Transit", "impact_severity": "elevated", "impact_description": "Rerouting via Cape of Good Hope adds 12-14 days transit time.", "timeline": "Immediate", "alternative_options": "Cape of Good Hope route, air freight for critical components", "cost_change_percent": 45},
+          {"node_name": "Rotterdam Port", "impact_severity": "elevated", "impact_description": "European distribution delayed 2-3 weeks. Inventory buffers sustain 30 days.", "timeline": "2-3 weeks", "alternative_options": "Piraeus port as alternate EU entry, direct Asia-EU air cargo", "cost_change_percent": 30},
+          {"node_name": "US Distribution Center", "impact_severity": "elevated", "impact_description": "US market faces 4-8 week shortage of advanced chips. Consumer electronics launch delays.", "timeline": "4-8 weeks", "alternative_options": "Strategic reserve drawdown, priority allocation to defense/auto", "cost_change_percent": 55}
+        ],
+        "overall_risk": "critical",
+        "executive_summary": "A Taiwan blockade scenario triggers catastrophic semiconductor supply disruption. TSMC's advanced fabs (producing 90% of the world's sub-7nm chips) halt immediately, creating a cascade that reaches US/EU consumers within 4-8 weeks. Total supply chain cost increase estimated at 110% across all nodes. Recommend immediate activation of buffer stock protocols and diversification of chip sourcing."
+      }
+    },
+    {
+      "id": "fb-scenario-energy",
+      "endpoint": "simulate-scenario",
+      "input_hash": "chain-energy",
+      "response": {
+        "impact_chain": [
+          {"node_name": "Saudi Aramco Ras Tanura", "impact_severity": "critical", "impact_description": "Production continues but export terminal operations disrupted by regional instability.", "timeline": "0-72 hours", "alternative_options": "Yanbu terminal (Red Sea side), UAE Fujairah exports", "cost_change_percent": 25},
+          {"node_name": "Strait of Hormuz", "impact_severity": "critical", "impact_description": "Insurance premiums spike 400%. Many tankers refuse transit without naval escort.", "timeline": "Immediate", "alternative_options": "East-West pipeline to Yanbu, reduced throughput under escort", "cost_change_percent": 180},
+          {"node_name": "Suez Canal Transit", "impact_severity": "high", "impact_description": "Combined Hormuz + Red Sea risk forces Cape routing, adding 15 days.", "timeline": "1-2 weeks", "alternative_options": "Cape of Good Hope, Trans-Med pipeline from Libya/Algeria", "cost_change_percent": 60},
+          {"node_name": "Mediterranean Shipping Lane", "impact_severity": "elevated", "impact_description": "Tanker traffic reduced 40% as vessels reroute around Africa.", "timeline": "2-3 weeks", "alternative_options": "Pipeline supply from North Africa, LNG spot cargoes", "cost_change_percent": 35},
+          {"node_name": "Rotterdam Europoort Refinery", "impact_severity": "high", "impact_description": "Crude input drops 30%. Refinery margins spike but throughput falls. EU strategic reserves activated.", "timeline": "3-6 weeks", "alternative_options": "North Sea crude (limited), US shale exports, strategic reserve release", "cost_change_percent": 90}
+        ],
+        "overall_risk": "critical",
+        "executive_summary": "Escalation in the Strait of Hormuz would disrupt 21% of global oil transit. European refineries face 30% input reduction within 6 weeks. Brent crude projected to spike above $140/barrel. EU strategic petroleum reserves provide 90-day buffer but cannot replace sustained flow. Recommend pre-positioning alternative crude contracts and activating Trans-Mediterranean pipeline capacity."
+      }
     },
     {
       "id": "fb-brief",
       "endpoint": "generate-brief",
-      "input_hash": "default",
-      "response": "{\"executive_summary\": \"Critical supply chain disruption detected. Taiwan strait tensions pose immediate risk to semiconductor supply.\", \"risk_matrix\": [], \"recommendations\": \"Diversify chip sourcing. Pre-order 90-day buffer stock. Activate alternative shipping routes via Cape of Good Hope.\"}"
+      "input_hash": null,
+      "response": {
+        "executive_summary": "Critical supply chain disruption detected across the Asia-Pacific corridor. Three concurrent threat vectors — Taiwan strait military exercises, Suez Canal blockage, and Red Sea attacks — create compounding risk to the global electronics supply chain.\n\nImmediate impact: TSMC advanced chip fabrication at risk of complete halt, affecting 90% of global sub-7nm semiconductor production. Secondary impacts cascade through Vietnam assembly operations and European/US distribution within 4-8 weeks.\n\nRecommended posture: DEFCON 2 supply chain alert. Activate buffer stock protocols, diversify sourcing, and pre-authorize Cape of Good Hope routing for all Asia-Europe shipments.",
+        "risk_matrix": [
+          {"node_name": "TSMC Fab 18", "risk_level": "critical", "primary_threat": "Taiwan strait military exercises — direct proximity to fabrication facility", "mitigation": "Activate Samsung/Intel backup qualification; accelerate 90-day chip buffer procurement"},
+          {"node_name": "Vietnam Assembly Hub", "risk_level": "elevated", "primary_threat": "Worker strike + upstream chip shortage creates dual disruption", "mitigation": "Negotiate strike resolution; shift overflow to India Foxconn facility"},
+          {"node_name": "Suez Canal Transit", "risk_level": "high", "primary_threat": "Vessel grounding blocks transit; Red Sea attacks deter alternate routing", "mitigation": "Pre-authorize Cape of Good Hope routing; air freight critical components"},
+          {"node_name": "Rotterdam Port", "risk_level": "normal", "primary_threat": "Delayed shipments from Asia reduce throughput", "mitigation": "Draw down 30-day inventory buffer; activate Piraeus as alternate EU entry"},
+          {"node_name": "US Distribution Center", "risk_level": "normal", "primary_threat": "4-8 week semiconductor shortage impacts consumer electronics", "mitigation": "Priority allocation to defense and automotive; delay non-critical product launches"}
+        ],
+        "scenario_analysis": "The convergence of three simultaneous disruptions is historically unprecedented. Each individual event would be manageable — together they create a cascading failure mode. The Taiwan strait exercises are the highest-leverage risk: a single escalation could halt TSMC output entirely, with no adequate short-term substitute at scale. The Suez/Red Sea disruptions amplify transit risk but can be mitigated via Cape routing at 12-14 day delay penalty.",
+        "recommendations": [
+          "Activate 90-day semiconductor buffer stock procurement from Samsung and Intel foundries",
+          "Pre-authorize Cape of Good Hope routing for all Asia-Europe container shipments",
+          "Establish air freight corridor for critical chip components (cost: ~8x sea freight)",
+          "Engage Vietnam labor ministry to mediate assembly worker strike resolution",
+          "Deploy real-time vessel tracking for all supply chain shipping assets",
+          "Convene weekly executive supply chain risk review until threat level drops below 'high'",
+          "Evaluate strategic inventory pre-positioning at Piraeus and Singapore hubs"
+        ],
+        "key_indicators": [
+          "TSMC monthly revenue guidance (leading indicator of production disruption)",
+          "Suez Canal Authority daily transit count (proxy for shipping normalization)",
+          "Baltic Dry Index / container shipping spot rates (cost pressure signal)",
+          "Taiwan Ministry of Defense press releases (escalation monitoring)",
+          "Lloyd's of London war risk insurance premiums for Red Sea transit"
+        ],
+        "full_report": "# World Pulse Intelligence Brief\n\n## Situation Overview\nThree concurrent geopolitical disruptions are impacting the global electronics supply chain...\n\n## Risk Assessment\nOverall risk level: **CRITICAL**\n\n## Recommendations\nSee executive summary for immediate action items.\n\n## Monitoring\nNext assessment scheduled in 24 hours."
+      }
     }
   ]
 }

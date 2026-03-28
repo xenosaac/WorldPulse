@@ -17,21 +17,13 @@ This module wraps that into a session manager that handles:
 
 import asyncio
 import json
+import logging
 import os
 from google import genai
 from google.genai import types
+from services import get_gemini_client
 
-_client = None
-
-
-def _get_client() -> genai.Client:
-    global _client
-    if _client is None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise RuntimeError("GEMINI_API_KEY not set")
-        _client = genai.Client(api_key=api_key)
-    return _client
+logger = logging.getLogger(__name__)
 
 
 # System instructions per session type
@@ -82,7 +74,7 @@ class LiveSessionManager:
 
     async def create_scenario_session(self):
         """Create a Live API session for voice scenario simulation."""
-        client = _get_client()
+        client = get_gemini_client()
         config = types.LiveConnectConfig(
             system_instruction=SCENARIO_SYSTEM_INSTRUCTION,
             tools=SCENARIO_TOOLS,
@@ -96,7 +88,7 @@ class LiveSessionManager:
 
     async def create_briefing_session(self, context: str):
         """Create a Live API session for voice-narrated briefing."""
-        client = _get_client()
+        client = get_gemini_client()
         instruction = BRIEFING_SYSTEM_INSTRUCTION + f"\n\nCONTEXT:\n{context}"
         config = types.LiveConnectConfig(
             system_instruction=instruction,

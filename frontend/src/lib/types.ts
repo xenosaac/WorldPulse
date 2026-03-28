@@ -49,9 +49,16 @@ export interface RiskBrief {
   scenario_id: string | null;
   executive_summary: string;
   risk_matrix: Record<string, unknown>[];
-  recommendations: string;
+  scenario_analysis?: string;
+  recommendations: string[];
+  key_indicators?: string[];
   full_report: string;
   created_at: string;
+}
+
+export interface APIError {
+  detail: string;
+  status: number;
 }
 
 // WebSocket message types for voice Live API

@@ -6,27 +6,18 @@ On parse failure, GeminiParseError is raised so route handlers trigger fallback.
 
 import asyncio
 import json
+import logging
 import os
 from google import genai
 from google.genai import types
+from services import get_gemini_client
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiParseError(Exception):
     """Raised when Gemini returns unparseable or empty results."""
     pass
-
-
-_client = None
-
-
-def _get_client() -> genai.Client:
-    global _client
-    if _client is None:
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise RuntimeError("GEMINI_API_KEY not set in environment")
-        _client = genai.Client(api_key=api_key)
-    return _client
 
 
 def _validate_event(evt: dict) -> dict:
@@ -75,7 +66,7 @@ Be specific about geographic locations. Extract 3-7 events from typical news foo
 
 async def analyze_video(file_uri: str) -> list[dict]:
     """Analyze a video file using Gemini 2.0 Flash. Returns extracted events with timestamps."""
-    client = _get_client()
+    client = get_gemini_client()
 
     def _call():
         return client.models.generate_content(
@@ -134,7 +125,7 @@ Return as JSON with keys: "impact_chain" (array of node impacts), "overall_risk"
 
 async def simulate_scenario(scenario_input: str, supply_chain: dict) -> dict:
     """Run a scenario simulation using Gemini 2.0 Flash with Google Search grounding."""
-    client = _get_client()
+    client = get_gemini_client()
 
     prompt = SCENARIO_PROMPT_TEMPLATE.format(
         supply_chain_json=json.dumps(supply_chain, indent=2),
@@ -203,7 +194,7 @@ async def generate_brief(
     events: list, supply_chain: dict, scenario: dict | None = None
 ) -> dict:
     """Generate a comprehensive risk brief using Gemini 2.0 Flash."""
-    client = _get_client()
+    client = get_gemini_client()
 
     scenario_section = ""
     if scenario:

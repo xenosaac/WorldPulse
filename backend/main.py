@@ -1,10 +1,14 @@
+import logging
 import os
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
+
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 
 from routes.events import router as events_router
 from routes.supply_chains import router as supply_chains_router
@@ -30,6 +34,15 @@ app.include_router(supply_chains_router)
 app.include_router(scenarios_router)
 app.include_router(briefs_router)
 app.include_router(voice_router)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logging.getLogger(__name__).error("Unhandled exception: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "type": type(exc).__name__},
+    )
 
 
 @app.get("/")

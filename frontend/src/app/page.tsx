@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Globe from '@/components/Globe';
 import VideoAnalysis from '@/components/VideoAnalysis';
 import SupplyChain from '@/components/SupplyChain';
@@ -7,14 +7,23 @@ import ScenarioPanel from '@/components/ScenarioPanel';
 import RiskBrief from '@/components/RiskBrief';
 import StatusBar from '@/components/StatusBar';
 import EventCard from '@/components/EventCard';
+import SoundManager from '@/components/SoundManager';
 import { useEvents } from '@/hooks/useEvents';
+import { useGeminiLive } from '@/hooks/useGeminiLive';
+import { useVideoSync } from '@/hooks/useVideoSync';
 import type { Event, SupplyChain as SupplyChainType, ScenarioResult } from '@/lib/types';
 
 export default function Home() {
-  const { events, loading, addEvent } = useEvents();
+  const { events, loading, addEvent, refresh } = useEvents();
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [chain, setChain] = useState<SupplyChainType | null>(null);
   const [scenarioResult, setScenarioResult] = useState<ScenarioResult | null>(null);
+  const [briefComplete, setBriefComplete] = useState(false);
+  const [muted, setMuted] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const { visibleEvents, isPlaying } = useVideoSync(events, videoRef);
+  const { status: geminiStatus } = useGeminiLive();
 
   return (
     <div className="h-screen flex flex-col">
@@ -48,7 +57,15 @@ export default function Home() {
       </div>
 
       {/* Bottom: Status Bar */}
-      <StatusBar eventCount={events.length} geminiStatus="idle" />
+      <StatusBar eventCount={events.length} geminiStatus={geminiStatus} />
+
+      {/* Non-visual audio component */}
+      <SoundManager
+        eventCount={events.length}
+        geminiActive={geminiStatus === 'active'}
+        briefComplete={briefComplete}
+        muted={muted}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 """Risk brief generation endpoint — Gemini synthesizes all intelligence into a report."""
 
 import json
+import logging
 import uuid
 from contextlib import closing
 from datetime import datetime, timezone
@@ -12,6 +13,8 @@ from typing import Optional
 import db
 from services import gemini_batch
 from services.fallback import get_fallback
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -57,8 +60,8 @@ async def generate_brief(req: BriefRequest):
     try:
         result = await gemini_batch.generate_brief(events, supply_chain, scenario)
     except Exception as e:
-        print(f"Gemini brief failed, using fallback: {e}")
-        fallback = get_fallback("generate-brief")
+        logger.warning("Gemini brief failed, using fallback: %s", e)
+        fallback = get_fallback("generate-brief", input_hash=req.chain_id)
         if fallback:
             result = fallback
         else:
@@ -66,6 +69,7 @@ async def generate_brief(req: BriefRequest):
 
     # Save to DB
     brief_id = f"brief-{uuid.uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
     with closing(db.get_db()) as conn:
         conn.execute(
             """INSERT INTO risk_briefs
@@ -79,7 +83,7 @@ async def generate_brief(req: BriefRequest):
                 json.dumps(result.get("risk_matrix", [])),
                 json.dumps(result.get("recommendations", [])),
                 result.get("full_report", ""),
-                datetime.now(timezone.utc).isoformat(),
+                now,
             ),
         )
         conn.commit()
@@ -94,4 +98,23 @@ async def generate_brief(req: BriefRequest):
         "recommendations": result.get("recommendations", []),
         "key_indicators": result.get("key_indicators", []),
         "full_report": result.get("full_report", ""),
+        "created_at": now,
     }
+
+
+@router.get("/briefs/{brief_id}")
+async def get_brief(brief_id: str):
+    with closing(db.get_db()) as conn:
+        row = conn.execute(
+            "SELECT * FROM risk_briefs WHERE id = ?", (brief_id,)
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Brief not found")
+        d = dict(row)
+        for field in ("risk_matrix", "recommendations"):
+            if d.get(field) and isinstance(d[field], str):
+                try:
+                    d[field] = json.loads(d[field])
+                except (json.JSONDecodeError, ValueError):
+                    d[field] = []
+        return d
