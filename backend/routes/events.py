@@ -44,13 +44,17 @@ async def get_event(event_id: str):
 
 
 class VideoAnalyzeRequest(BaseModel):
-    file_uri: str = Field(..., max_length=500)
+    file_uri: str | None = Field(None, max_length=500)
+    url: str | None = Field(None, max_length=500)
 
 
 @router.post("/analyze-video")
 async def analyze_video(req: VideoAnalyzeRequest):
+    video_source = req.url or req.file_uri
+    if not video_source:
+        raise HTTPException(status_code=400, detail="Provide either 'url' (YouTube) or 'file_uri' (GCS)")
     try:
-        result = await gemini_batch.analyze_video(req.file_uri)
+        result = await gemini_batch.analyze_video(video_source)
         events = result if isinstance(result, list) else result.get("events", [])
     except Exception as e:
         logger.warning("Gemini video analysis failed, using fallback: %s", e)

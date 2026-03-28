@@ -1,64 +1,181 @@
 'use client';
 import { useState } from 'react';
 import type { SupplyChain as SupplyChainType } from '@/lib/types';
-import { getSupplyChains } from '@/lib/api';
-
-// TODO: Implement supply chain panel
-// - "Load Supply Chain" button
-// - Fetches chain data from API
-// - Triggers golden arcs on globe connecting nodes
-// - Shows risk level per node
+import { getSupplyChains, addSupplyChainNode, deleteSupplyChainNode } from '@/lib/api';
 
 interface SupplyChainProps {
   onChainLoaded: (chain: SupplyChainType) => void;
 }
 
+const RISK_COLORS: Record<string, string> = {
+  critical: 'text-red-500',
+  high: 'text-orange-500',
+  elevated: 'text-yellow-500',
+  normal: 'text-green-500',
+};
+
+const DOT_COLORS: Record<string, string> = {
+  critical: 'bg-red-500',
+  high: 'bg-orange-500',
+  elevated: 'bg-yellow-500',
+  normal: 'bg-green-500',
+};
+
 export default function SupplyChain({ onChainLoaded }: SupplyChainProps) {
-  const [chain, setChain] = useState<SupplyChainType | null>(null);
+  const [chains, setChains] = useState<SupplyChainType[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCountry, setNewCountry] = useState('');
+  const [newLat, setNewLat] = useState('');
+  const [newLng, setNewLng] = useState('');
+
+  const chain = chains[selectedIdx] || null;
 
   const handleLoad = async () => {
     setLoading(true);
     try {
-      const chains = await getSupplyChains();
-      if (chains.length > 0) {
-        setChain(chains[0]);
-        onChainLoaded(chains[0]);
-      }
+      const data = await getSupplyChains();
+      setChains(data);
+      if (data.length > 0) onChainLoaded(data[0]);
     } catch (err) {
-      console.error('Failed to load supply chain:', err);
+      console.error('Failed to load supply chains:', err);
     } finally {
       setLoading(false);
     }
   };
 
+  const switchChain = (idx: number) => {
+    setSelectedIdx(idx);
+    if (chains[idx]) onChainLoaded(chains[idx]);
+  };
+
+  const refreshChains = async () => {
+    const data = await getSupplyChains();
+    setChains(data);
+    if (data[selectedIdx]) onChainLoaded(data[selectedIdx]);
+  };
+
+  const handleAddNode = async () => {
+    if (!chain || !newName.trim()) return;
+    try {
+      await addSupplyChainNode(chain.id, {
+        name: newName.trim(),
+        country: newCountry.trim() || undefined,
+        lat: parseFloat(newLat) || 0,
+        lng: parseFloat(newLng) || 0,
+      });
+      setNewName('');
+      setNewCountry('');
+      setNewLat('');
+      setNewLng('');
+      setShowAdd(false);
+      await refreshChains();
+    } catch (err) {
+      console.error('Failed to add node:', err);
+    }
+  };
+
+  const handleDeleteNode = async (nodeId: string) => {
+    try {
+      await deleteSupplyChainNode(nodeId);
+      await refreshChains();
+    } catch (err) {
+      console.error('Failed to delete node:', err);
+    }
+  };
+
   return (
-    <div className="bg-gray-800 rounded-lg p-4">
-      <h3 className="text-white font-semibold mb-2">Supply Chain</h3>
-      {!chain ? (
+    <section className="space-y-3 pt-3">
+      <span className="text-xs font-light text-slate-300">Supply chain</span>
+
+      {chains.length === 0 ? (
         <button
           onClick={handleLoad}
           disabled={loading}
-          className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded text-sm disabled:opacity-50"
+          className="w-full py-2.5 bg-primary text-slate-900 text-[11px] font-label font-medium tracking-widest uppercase rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
         >
-          {loading ? 'Loading...' : 'Load Supply Chain'}
+          {loading ? 'Loading...' : 'Load supply chains'}
         </button>
       ) : (
-        <div className="text-gray-300 text-sm">
-          <p className="font-medium">{chain.name}</p>
-          <p className="text-gray-400">{chain.nodes.length} nodes</p>
-          {chain.nodes.map((node) => (
-            <div key={node.id} className="mt-1 flex justify-between">
-              <span>{node.name}</span>
-              <span className={`text-xs px-2 py-0.5 rounded ${
-                node.risk_level === 'critical' ? 'bg-red-900 text-red-300' :
-                node.risk_level === 'high' ? 'bg-orange-900 text-orange-300' :
-                'bg-green-900 text-green-300'
-              }`}>{node.risk_level}</span>
+        <>
+          {/* Chain switcher tabs */}
+          <div className="flex gap-1">
+            {chains.map((c, i) => (
+              <button
+                key={c.id}
+                onClick={() => switchChain(i)}
+                className={`text-[9px] font-label px-2 py-1 rounded transition-colors ${
+                  i === selectedIdx
+                    ? 'bg-primary/10 text-primary border border-primary/30'
+                    : 'bg-slate-800/30 text-slate-500 border border-white/5 hover:text-slate-300'
+                }`}
+              >
+                {c.name.split('(')[0].trim()}
+              </button>
+            ))}
+          </div>
+
+          {chain && (
+            <div className="bg-slate-800/30 rounded-lg overflow-hidden">
+              <div className="px-3 py-2 border-b border-white/5 flex justify-between items-center">
+                <p className="text-[9px] font-label text-slate-500 uppercase truncate">
+                  {chain.nodes.map((n) => n.name.split(' ')[0]).join(' → ')}
+                </p>
+                <button
+                  onClick={() => setShowAdd(!showAdd)}
+                  className="text-primary text-[11px] hover:text-primary/80"
+                >
+                  {showAdd ? '−' : '+'}
+                </button>
+              </div>
+
+              {/* Add node form */}
+              {showAdd && (
+                <div className="px-3 py-2 border-b border-white/5 space-y-2">
+                  <input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Node name (e.g. Shenzhen Hub)"
+                    className="w-full bg-slate-800/50 border border-white/5 rounded text-[10px] py-1.5 px-2 text-slate-200 placeholder:text-slate-600 outline-none focus:ring-1 focus:ring-primary"
+                  />
+                  <div className="grid grid-cols-3 gap-1">
+                    <input value={newCountry} onChange={(e) => setNewCountry(e.target.value)} placeholder="Country" className="bg-slate-800/50 border border-white/5 rounded text-[10px] py-1.5 px-2 text-slate-200 placeholder:text-slate-600 outline-none" />
+                    <input value={newLat} onChange={(e) => setNewLat(e.target.value)} placeholder="Lat" className="bg-slate-800/50 border border-white/5 rounded text-[10px] py-1.5 px-2 text-slate-200 placeholder:text-slate-600 outline-none" />
+                    <input value={newLng} onChange={(e) => setNewLng(e.target.value)} placeholder="Lng" className="bg-slate-800/50 border border-white/5 rounded text-[10px] py-1.5 px-2 text-slate-200 placeholder:text-slate-600 outline-none" />
+                  </div>
+                  <button onClick={handleAddNode} className="w-full py-1.5 bg-primary text-slate-900 text-[10px] font-label rounded hover:opacity-90">
+                    Add node
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-col">
+                {chain.nodes.map((node) => (
+                  <div key={node.id} className="order-book-row px-3 py-2 flex items-center justify-between group">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-1.5 h-1.5 rounded-full ${DOT_COLORS[node.risk_level] || 'bg-slate-500'}`} />
+                      <span className="text-[11px] font-light text-slate-300">{node.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`data-mono text-[10px] uppercase ${RISK_COLORS[node.risk_level] || 'text-slate-500'}`}>
+                        {node.risk_level}
+                      </span>
+                      <button
+                        onClick={() => handleDeleteNode(node.id)}
+                        className="text-slate-600 hover:text-red-400 text-[10px] opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
-    </div>
+    </section>
   );
 }

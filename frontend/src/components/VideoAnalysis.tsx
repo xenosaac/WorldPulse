@@ -1,28 +1,59 @@
 'use client';
-import { useRef } from 'react';
+import { useState } from 'react';
 import type { Event } from '@/lib/types';
-
-// TODO: Implement split-screen video player with synced event display
-// - Video player on the left
-// - Events appear synced to video_timestamp as video plays
-// - Event counter shows detected count
-// - Uses useVideoSync hook
+import { analyzeVideo } from '@/lib/api';
 
 interface VideoAnalysisProps {
   events: Event[];
   onEventDetected: (event: Event) => void;
+  onAnalysisComplete?: () => void;
 }
 
-export default function VideoAnalysis({ events, onEventDetected }: VideoAnalysisProps) {
-  const videoRef = useRef<HTMLVideoElement>(null);
+export default function VideoAnalysis({ events, onEventDetected, onAnalysisComplete }: VideoAnalysisProps) {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [extracted, setExtracted] = useState(0);
+  const videoEventCount = events.filter((e) => e.source_type === 'video').length + extracted;
+
+  const handleAnalyze = async () => {
+    setLoading(true);
+    setExtracted(0);
+    try {
+      const source = url.trim() || 'fallback';
+      const result = await analyzeVideo(source === 'fallback' ? 'gs://demo/fallback' : source);
+      result.events.forEach((evt) => onEventDetected(evt));
+      setExtracted(result.events.length);
+      onAnalysisComplete?.();
+    } catch (err) {
+      console.error('Video analysis failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4">
-      <h3 className="text-white font-semibold mb-2">Video Analysis</h3>
-      <div className="text-gray-400 text-sm">
-        <p>TODO: Split-screen video player + synced event extraction</p>
-        <p className="mt-1">Events with video_timestamp: {events.filter(e => e.video_timestamp !== null).length}</p>
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-light text-slate-300">Video analysis</span>
+        <span className="data-mono text-[9px] text-slate-500">{videoEventCount} EXTRACTED</span>
       </div>
-    </div>
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && handleAnalyze()}
+        placeholder="Paste YouTube URL or leave empty for demo"
+        className="w-full bg-slate-800/50 border border-white/5 rounded text-xs py-2 px-3 focus:ring-1 focus:ring-primary focus:border-transparent placeholder:text-slate-600 transition-colors text-slate-200 outline-none"
+      />
+      <button
+        onClick={handleAnalyze}
+        disabled={loading}
+        className={`w-full py-2.5 bg-primary text-slate-900 text-[11px] font-label font-medium tracking-widest uppercase rounded-lg hover:opacity-90 transition-all disabled:opacity-50 ${loading ? 'btn-loading' : ''}`}
+      >
+        {loading ? 'Analyzing...' : 'Analyze video'}
+      </button>
+      {extracted > 0 && !loading && (
+        <p className="text-[10px] text-primary">{extracted} events extracted and added to globe</p>
+      )}
+    </section>
   );
 }

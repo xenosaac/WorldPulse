@@ -21,7 +21,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import db
-from services.gemini_batch import analyze_video, _get_client
+from services.gemini_batch import analyze_video
+from services import get_gemini_client
 
 
 async def upload_and_analyze(video_path: str):
@@ -34,7 +35,7 @@ async def upload_and_analyze(video_path: str):
         sys.exit(1)
 
     print(f"Uploading video: {video_path}")
-    client = _get_client()
+    client = get_gemini_client()
 
     # Upload to Gemini Files API
     uploaded_file = client.files.upload(file=video_path)

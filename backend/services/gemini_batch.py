@@ -65,16 +65,24 @@ Be specific about geographic locations. Extract 3-7 events from typical news foo
 
 
 async def analyze_video(file_uri: str) -> list[dict]:
-    """Analyze a video file using Gemini 2.0 Flash. Returns extracted events with timestamps."""
+    """Analyze a video (GCS URI or YouTube URL) using Gemini 2.0 Flash. Returns extracted events."""
     client = get_gemini_client()
 
+    is_youtube = file_uri.startswith("https://") or file_uri.startswith("http://")
+
     def _call():
-        return client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=[
+        if is_youtube:
+            contents = [
+                f"Analyze the video at this URL: {file_uri}\n\n{VIDEO_ANALYSIS_PROMPT}",
+            ]
+        else:
+            contents = [
                 types.Part.from_uri(file_uri=file_uri, mime_type="video/mp4"),
                 VIDEO_ANALYSIS_PROMPT,
-            ],
+            ]
+        return client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=contents,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.3,
