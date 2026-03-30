@@ -2,6 +2,10 @@
 
 AI-powered global intelligence platform for supply chain risk assessment.
 
+<p align="center">
+  <img src="demo.png" alt="World Pulse — 3D globe with real-time geopolitical event tracking and supply chain risk overlay" width="90%">
+</p>
+
 ## What it does
 
 World Pulse monitors global events in real-time and translates geopolitical developments into actionable supply chain risk assessments.
